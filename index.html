@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Fun, Food &amp; Travel</title>
+  <meta name="theme-color" content="#e8590c">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="FFT">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/exifr@7/dist/lite.umd.js" defer></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+<main>
+  <nav class="tabs">
+    <a href="#new" data-tab="new">＋ New</a>
+    <a href="#posts" data-tab="posts">My posts</a>
+    <a href="#settings" data-tab="settings">Settings</a>
+  </nav>
+
+  <!-- ===== New post ===== -->
+  <section id="view-new" hidden>
+    <!-- Step 1: pick -->
+    <div id="step-pick">
+      <header class="top">
+        <h1>Fun, Food &amp; Travel</h1>
+        <p class="muted">Share a moment. We find the place, the gear and the bookings.</p>
+      </header>
+      <label class="drop">
+        <input id="files" type="file" accept="image/*,video/*" multiple hidden>
+        <span class="big">＋</span>
+        <span>Choose photos &amp; videos</span>
+        <small class="muted">Only the items you pick are used. Nothing else in your library is read.</small>
+      </label>
+      <div id="thumbs" class="thumbs"></div>
+      <label class="field">Tags or notes (optional)
+        <input id="tags" type="text" placeholder="e.g. #positano #gelato sunset boat trip">
+      </label>
+      <label class="check"><input id="use-gps" type="checkbox" checked>
+        Use photo location (rounded to about 1 km)</label>
+      <button id="analyze" class="primary" disabled>Analyze with AI</button>
+      <p id="pick-status" class="status"></p>
+    </div>
+
+    <!-- Step 2: review -->
+    <div id="step-review" hidden>
+      <p id="summary" class="muted"></p>
+
+      <h2>Location</h2>
+      <div class="card">
+        <input id="place" type="text" placeholder="Where was this?">
+        <p id="place-evidence" class="muted small"></p>
+        <label class="check"><input id="show-place" type="checkbox"> Show location on my post</label>
+      </div>
+
+      <h2>Caption</h2>
+      <textarea id="caption" rows="2"></textarea>
+
+      <h2>Shop &amp; book <small class="muted">— untick anything that's wrong</small></h2>
+      <ul id="items" class="items"></ul>
+      <button id="add-item" class="ghost">+ Add an item</button>
+
+      <h2>Nearby: stay, eat, get around, do</h2>
+      <p id="local-status" class="status small"></p>
+      <ul id="nearby" class="items"></ul>
+
+      <h2>Good to know</h2>
+      <ul id="local" class="items"></ul>
+      <button id="get-local" class="ghost">Refresh nearby &amp; news for this location</button>
+
+      <div class="row">
+        <button id="back" class="ghost">Back</button>
+        <button id="publish" class="primary">Save post</button>
+      </div>
+      <p id="review-status" class="status"></p>
+    </div>
+  </section>
+
+  <!-- ===== My posts ===== -->
+  <section id="view-posts" hidden>
+    <h1>My posts</h1>
+    <p id="posts-empty" class="muted" hidden>No posts yet. Tap <strong>＋ New</strong> to make one.</p>
+    <ul id="post-list" class="post-list"></ul>
+  </section>
+
+  <!-- ===== One post ===== -->
+  <section id="view-post" class="post" hidden>
+    <div id="post-body"></div>
+    <div class="row">
+      <button id="share-post" class="primary">Share</button>
+      <button id="delete-post" class="ghost">Delete</button>
+    </div>
+    <p id="post-status" class="status"></p>
+  </section>
+
+  <!-- ===== Settings ===== -->
+  <section id="view-settings" hidden>
+    <h1>Settings</h1>
+    <div id="welcome" class="card" hidden>
+      <strong>Welcome!</strong>
+      <p>To analyse your photos, this app uses Claude by Anthropic with <em>your own</em>
+        API key. Paste it below. To just look around first, type <code>demo</code>.</p>
+    </div>
+    <label class="field">Anthropic API key
+      <input id="api-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
+             placeholder="sk-ant-…  (or type demo)">
+    </label>
+    <p class="muted small">Your key is saved only on this phone and is sent only to Anthropic.
+      Don't use this app on a phone you share with others.</p>
+
+    <h2>Affiliate IDs <small class="muted">(optional)</small></h2>
+    <label class="field">Amazon Associates tag <input id="id-amazon" type="text" autocapitalize="off"></label>
+    <label class="field">eBay Partner Network campaign ID <input id="id-ebay" type="text" autocapitalize="off"></label>
+    <label class="field">Booking.com affiliate ID <input id="id-booking" type="text" autocapitalize="off"></label>
+    <label class="field">GetYourGuide partner ID <input id="id-gyg" type="text" autocapitalize="off"></label>
+
+    <button id="save-settings" class="primary">Save</button>
+    <p id="settings-status" class="status"></p>
+
+    <h2>Install on your phone</h2>
+    <p class="small"><strong>iPhone (Safari):</strong> tap the Share button
+      <span aria-hidden="true">⬆︎</span>, then <em>Add to Home Screen</em>.<br>
+      <strong>Android (Chrome):</strong> tap ⋮, then <em>Add to Home screen</em> or <em>Install app</em>.</p>
+  </section>
+</main>
+
+<template id="item-tpl">
+  <li class="item">
+    <input type="checkbox" class="keep">
+    <img class="thumb" alt="">
+    <div class="grow">
+      <input type="text" class="name" placeholder="What is it?">
+      <div class="row tight">
+        <select class="category">
+          <option value="product">Product</option>
+          <option value="hotel">Hotel</option>
+          <option value="car_rental">Car rental</option>
+          <option value="experience">Experience</option>
+          <option value="restaurant">Restaurant</option>
+          <option value="place">Place</option>
+        </select>
+        <span class="badge small"></span>
+      </div>
+      <input type="text" class="query small" placeholder="Search words for shops">
+    </div>
+  </li>
+</template>
+</body>
+</html>
