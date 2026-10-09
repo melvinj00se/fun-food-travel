@@ -644,6 +644,26 @@ function updatePostShareBar() {
 
 // ---------- social link import ----------
 
+function makeLinkPlaceholder(url, host) {
+  const c = document.createElement("canvas");
+  c.width = 640; c.height = 480;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#fffaf5";
+  ctx.fillRect(0, 0, 640, 480);
+  ctx.fillStyle = "#e8590c";
+  ctx.font = "bold 28px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(host, 320, 200);
+  ctx.fillStyle = "#1f1a17";
+  ctx.font = "18px sans-serif";
+  const short = url.length > 60 ? url.slice(0, 57) + "…" : url;
+  ctx.fillText(short, 320, 250);
+  ctx.fillStyle = "#6b625c";
+  ctx.font = "16px sans-serif";
+  ctx.fillText("Shared link — AI will search the web for details", 320, 310);
+  return c;
+}
+
 $("import-link").addEventListener("click", async () => {
   const url = $("social-link").value.trim();
   if (!url) return status("pick", "Paste a URL first.");
@@ -656,21 +676,28 @@ $("import-link").addEventListener("click", async () => {
       if (videoId) {
         const thumbUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
         status("pick", "Fetching YouTube thumbnail…");
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.src = thumbUrl;
-        await img.decode();
-        const canvas = fitCanvas(img, img.naturalWidth, img.naturalHeight, MAX_SIDE);
-        addFrame(canvas);
-        picked.push({ file: await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.85)), kind: "image" });
+        try {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.src = thumbUrl;
+          await img.decode();
+          const canvas = fitCanvas(img, img.naturalWidth, img.naturalHeight, MAX_SIDE);
+          addFrame(canvas);
+          picked.push({ file: await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.85)), kind: "image" });
+        } catch {
+          addFrame(makeLinkPlaceholder(url, host));
+        }
         $("analyze").disabled = false;
         $("tags").value = ($("tags").value ? $("tags").value + " " : "") + url;
-        status("pick", "YouTube thumbnail imported. Add more media or tap Analyze.");
+        status("pick", "YouTube link imported. Add more media or tap Analyze.");
         return;
       }
     }
+    // For any other link: create a placeholder frame so Analyze works
+    addFrame(makeLinkPlaceholder(url, host));
+    $("analyze").disabled = false;
     $("tags").value = ($("tags").value ? $("tags").value + " " : "") + url;
-    status("pick", `Link added to tags. For ${host}, also add a screenshot of the post for best results.`);
+    status("pick", `${host} link imported. Tap Analyze — AI will use web search to find details. You can also add photos for better results.`);
   } catch {
     status("pick", "That doesn't look like a valid URL.");
   }

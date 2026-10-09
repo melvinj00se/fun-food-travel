@@ -81,6 +81,12 @@ travel site (for the rest) to find this or something very close.
 this exact activity or place (e.g. water shoes and a waterproof phone pouch for a \
 waterfall). Use frame_index 0 and confidence "medium" for these.
 
+If the creator's tags contain a URL (from social media, YouTube, etc.) and the images \
+are just a placeholder, focus on identifying the location, products, and experiences \
+from the URL itself. Use the URL and any text in the tags to determine what the content \
+is about, even without visual evidence. Set source to "seen" for items you can confirm \
+from the URL context.
+
 If audio is provided, also use it to:
 - Identify spoken language and dialect (helps narrow location)
 - Catch place names, street names, or transit announcements
