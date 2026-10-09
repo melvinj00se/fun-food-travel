@@ -81,6 +81,12 @@ travel site (for the rest) to find this or something very close.
 this exact activity or place (e.g. water shoes and a waterproof phone pouch for a \
 waterfall). Use frame_index 0 and confidence "medium" for these.
 
+If audio is provided, also use it to:
+- Identify spoken language and dialect (helps narrow location)
+- Catch place names, street names, or transit announcements
+- Note ambient sounds that suggest a specific environment (market, beach, train station, temple)
+- Identify any brand or product names mentioned in speech
+
 Rules: "seen" items must actually be visible or stated in the tags; never invent them. \
 Do not identify people or describe their bodies. At most 12 seen items; prefer quality \
 over quantity. Write the caption in the creator's voice, short and upbeat, no hashtags.`;
@@ -101,6 +107,12 @@ Reply with ONLY a JSON object, no other text:
 in your own words", "url": "source URL", "source": "publisher name"}],
  "nearby": [{"name": "...", "category": "hotel|restaurant|car_rental|experience", \
 "note": "..."}]}`;
+
+function uint8ToBase64(bytes) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
 
 function client(apiKey) {
   // The key is the phone owner's own and never leaves this device except to
@@ -128,8 +140,8 @@ async function call(fn) {
   }
 }
 
-/** frames: base64 JPEGs; gps: {lat, lon} rounded, or null. */
-export async function analyze(apiKey, frames, tags, gps) {
+/** frames: base64 JPEGs; gps: {lat, lon} rounded, or null; audio: Uint8Array WAV, or null. */
+export async function analyze(apiKey, frames, tags, gps, audio) {
   if (apiKey === DEMO_KEY) return demoResult(frames.length);
 
   const content = [];
@@ -137,6 +149,13 @@ export async function analyze(apiKey, frames, tags, gps) {
     content.push({ type: "text", text: `Image ${i}:` });
     content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data } });
   });
+
+  if (audio) {
+    const audioB64 = uint8ToBase64(audio);
+    content.push({ type: "input_audio", source: { type: "base64", media_type: "audio/wav", data: audioB64 } });
+    content.push({ type: "text", text: "Audio from the video is included above. Listen for spoken language, place names, announcements, ambient sounds, and any brand/product mentions." });
+  }
+
   const context = [`Creator tags/notes: ${tags.trim() || "(none)"}`];
   if (gps) context.push(`Approximate GPS from photo metadata: ${gps.lat}, ${gps.lon}`);
   content.push({ type: "text", text: context.join("\n") });

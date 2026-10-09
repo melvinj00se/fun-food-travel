@@ -5,6 +5,8 @@
 import { analyze, localInfo, DEMO_KEY } from "./ai.js";
 import { makeLinks } from "./links.js";
 import * as db from "./db.js";
+import { renderShareBar } from "./social.js";
+import { buildIndex, search as localSearch, semanticSearch } from "./search.js";
 
 const MAX_FRAMES = 12;
 const FRAMES_PER_VIDEO = 6;
@@ -72,6 +74,83 @@ $("save-settings").addEventListener("click", () => {
   if (key) location.hash = "#new";
 });
 
+// ---------- install prompt (Android) ----------
+
+let deferredInstallPrompt = null;
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  showInstallButton();
+});
+
+function showInstallButton() {
+  const existing = $("install-btn");
+  if (existing) return;
+  const btn = document.createElement("button");
+  btn.id = "install-btn";
+  btn.className = "primary";
+  btn.textContent = "Install Fun, Food & Travel";
+  btn.addEventListener("click", async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    btn.remove();
+  });
+  const target = $("view-settings").querySelector("h2:last-of-type");
+  if (target) target.before(btn);
+}
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  const btn = $("install-btn");
+  if (btn) btn.remove();
+});
+
+// ---------- audio extraction ----------
+
+let audioData = null;
+
+async function extractAudio(videoFile, maxDurationSec = 30) {
+  try {
+    const arrayBuffer = await videoFile.arrayBuffer();
+    const audioCtx = new AudioContext({ sampleRate: 16000 });
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    audioCtx.close();
+    const duration = Math.min(audioBuffer.duration, maxDurationSec);
+    const numSamples = Math.floor(duration * 16000);
+    const channelData = audioBuffer.getChannelData(0);
+    const samples = channelData.slice(0, numSamples);
+    return encodeWav(samples, 16000);
+  } catch {
+    return null;
+  }
+}
+
+function encodeWav(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const w = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
+  w(0, "RIFF");
+  view.setUint32(4, 36 + samples.length * 2, true);
+  w(8, "WAVE"); w(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  w(36, "data");
+  view.setUint32(40, samples.length * 2, true);
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return new Uint8Array(buffer);
+}
+
 // ---------- routing ----------
 
 function route() {
@@ -79,25 +158,27 @@ function route() {
   objectUrls = [];
   let [view, id] = (location.hash.slice(1) || "new").split("/");
   if (!apiKey() && view !== "settings") view = "settings";
-  for (const v of ["new", "posts", "post", "settings"]) $(`view-${v}`).hidden = v !== view;
+  for (const v of ["new", "posts", "post", "search", "settings"]) $(`view-${v}`).hidden = v !== view;
   for (const a of document.querySelectorAll(".tabs a")) {
     a.classList.toggle("active", a.dataset.tab === (view === "post" ? "posts" : view));
   }
-  if (view === "settings") fillSettingsForm();
+  if (view === "settings") { fillSettingsForm(); if (deferredInstallPrompt) showInstallButton(); }
   if (view === "posts") renderPostList();
   if (view === "post") renderPost(id);
+  if (view === "search") initSearch();
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", route);
 
 // ---------- Step 1: pick & sample ----------
 
-$("files").addEventListener("change", async (ev) => {
+async function handleFiles(ev) {
   const files = [...ev.target.files];
   if (!files.length) return;
   frames = [];
   picked = [];
   gps = null;
+  audioData = null;
   $("thumbs").innerHTML = "";
   $("analyze").disabled = true;
   status("pick", "Preparing your media…");
@@ -111,6 +192,7 @@ $("files").addEventListener("change", async (ev) => {
         const room = Math.min(FRAMES_PER_VIDEO, MAX_FRAMES - frames.length);
         if (room > 0) for (const canvas of await sampleVideo(file, room)) addFrame(canvas);
         picked.push({ file, kind: "video" });
+        if (!audioData) audioData = await extractAudio(file);
       } else {
         if (!gps) gps = await readGps(file);
         const canvas = await drawImage(file, MAX_SIDE);
@@ -125,9 +207,14 @@ $("files").addEventListener("change", async (ev) => {
   $("analyze").disabled = frames.length === 0;
   let msg = `${picked.length} item${picked.length === 1 ? "" : "s"} ready (${frames.length} frames for the AI)`;
   if (gps) msg += " · location found in photo";
+  if (audioData) msg += " · audio extracted for analysis";
   if (problems.length) msg += ` · couldn't read: ${problems.join(", ")}`;
   status("pick", msg);
-});
+}
+
+for (const id of ["files", "camera-photo", "camera-video"]) {
+  $(id).addEventListener("change", handleFiles);
+}
 
 function videoType(file) {
   if (Object.values(VIDEO_TYPES).includes(file.type)) return file.type;
@@ -214,7 +301,7 @@ $("analyze").addEventListener("click", async () => {
   status("pick", "AI is looking at your photos… (about 20–40 seconds)");
   try {
     analysis = await analyze(apiKey(), frames.map((f) => f.b64), $("tags").value,
-      $("use-gps").checked ? gps : null);
+      $("use-gps").checked ? gps : null, audioData);
     showReview();
     if ($("place").value.trim()) loadLocal();
   } catch (err) {
@@ -371,8 +458,9 @@ $("publish").addEventListener("click", async () => {
 });
 
 function resetNew() {
-  frames = []; picked = []; gps = null; analysis = null;
-  $("files").value = ""; $("thumbs").innerHTML = ""; $("tags").value = "";
+  frames = []; picked = []; gps = null; analysis = null; audioData = null;
+  $("files").value = ""; $("camera-photo").value = ""; $("camera-video").value = "";
+  $("thumbs").innerHTML = ""; $("tags").value = ""; $("social-link").value = "";
   $("analyze").disabled = true;
   status("pick", ""); status("review", "");
   showStep("pick");
@@ -483,6 +571,7 @@ async function renderPost(id) {
   }
   body.append(el("p", { class: "disclosure" },
     "Some links are affiliate links. If you buy or book through them, the creator may earn a commission at no extra cost to you."));
+  updatePostShareBar();
 }
 
 function shareText(p) {
@@ -499,13 +588,30 @@ function shareText(p) {
   return lines.join("\n");
 }
 
+$("share-preview").addEventListener("click", async () => {
+  const caption = $("caption").value.trim();
+  const place = $("place").value.trim();
+  const text = [caption, place ? `📍 ${place}` : "", "", "Created with Fun, Food & Travel"].filter(Boolean).join("\n");
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: caption || "Preview", text });
+    } else {
+      await navigator.clipboard?.writeText(text);
+      status("review", "Preview text copied to clipboard.");
+    }
+  } catch (err) {
+    if (err.name !== "AbortError") status("review", `Couldn't share: ${err.message}`);
+  }
+});
+
 $("share-post").addEventListener("click", async () => {
   const p = currentPost;
   if (!p) return;
   const text = shareText(p);
-  const files = p.media.map((m) => new File([m.blob], m.name, { type: m.type }));
+  const shareableMedia = p.media.filter((m) => m.blob.size < 20 * 1024 * 1024);
+  const files = shareableMedia.map((m) => new File([m.blob], m.name, { type: m.type }));
   try {
-    if (navigator.canShare?.({ files, text })) {
+    if (files.length && navigator.canShare?.({ files, text })) {
       await navigator.share({ files, text });
     } else if (navigator.share) {
       await navigator.share({ title: p.caption, text });
@@ -514,8 +620,7 @@ $("share-post").addEventListener("click", async () => {
       status("post", "Post text and links copied. Paste them anywhere.");
     }
   } catch (err) {
-    if (err.name === "AbortError") return; // user closed the share sheet
-    // Some apps refuse big videos - fall back to sharing just the text.
+    if (err.name === "AbortError") return;
     try { await navigator.share({ title: p.caption, text }); }
     catch (e2) { if (e2.name !== "AbortError") status("post", `Couldn't share: ${e2.message}`); }
   }
@@ -525,6 +630,115 @@ $("delete-post").addEventListener("click", async () => {
   if (!currentPost || !confirm("Delete this post from your phone?")) return;
   await db.deletePost(currentPost.id);
   location.hash = "#posts";
+});
+
+// ---------- social share bar in post view ----------
+
+function updatePostShareBar() {
+  const bar = $("post-share-bar");
+  if (!bar || !currentPost) return;
+  bar.innerHTML = "";
+  const text = shareText(currentPost);
+  bar.append(renderShareBar(text, ""));
+}
+
+// ---------- social link import ----------
+
+$("import-link").addEventListener("click", async () => {
+  const url = $("social-link").value.trim();
+  if (!url) return status("pick", "Paste a URL first.");
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace("www.", "");
+    if (host.includes("youtube.com") || host.includes("youtu.be")) {
+      let videoId = parsed.searchParams.get("v");
+      if (!videoId && host.includes("youtu.be")) videoId = parsed.pathname.slice(1);
+      if (videoId) {
+        const thumbUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+        status("pick", "Fetching YouTube thumbnail…");
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = thumbUrl;
+        await img.decode();
+        const canvas = fitCanvas(img, img.naturalWidth, img.naturalHeight, MAX_SIDE);
+        addFrame(canvas);
+        picked.push({ file: await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.85)), kind: "image" });
+        $("analyze").disabled = false;
+        $("tags").value = ($("tags").value ? $("tags").value + " " : "") + url;
+        status("pick", "YouTube thumbnail imported. Add more media or tap Analyze.");
+        return;
+      }
+    }
+    $("tags").value = ($("tags").value ? $("tags").value + " " : "") + url;
+    status("pick", `Link added to tags. For ${host}, also add a screenshot of the post for best results.`);
+  } catch {
+    status("pick", "That doesn't look like a valid URL.");
+  }
+});
+
+// ---------- search ----------
+
+async function initSearch() {
+  await buildIndex();
+}
+
+$("search-go").addEventListener("click", async () => {
+  const query = $("search-query").value.trim();
+  if (!query) return;
+  $("search-go").disabled = true;
+  status("search", "Searching…");
+  $("search-results").innerHTML = "";
+  $("search-chat").hidden = true;
+
+  const results = localSearch(query);
+  if (results.length) {
+    for (const r of results.slice(0, 8)) {
+      const card = el("a", { class: "search-card", href: `#post/${r.id}` });
+      if (r.cover) card.append(el("img", { src: r.cover, alt: "" }));
+      const info = el("div", { class: "info" });
+      info.append(el("strong", {}, r.caption || "Untitled"));
+      if (r.place) info.append(el("p", { class: "place small" }, `📍 ${r.place}`));
+      card.append(info);
+      $("search-results").append(card);
+    }
+    status("search", `${results.length} post${results.length === 1 ? "" : "s"} found.`);
+  } else {
+    status("search", "No matching posts. Searching the web…");
+    try {
+      const webResults = await semanticSearch(apiKey(), query);
+      $("search-chat").hidden = false;
+      $("chat-response").innerHTML = "";
+      if (webResults.response) {
+        $("chat-response").textContent = webResults.response;
+      }
+      const L = links();
+      for (const item of webResults.suggestions || []) {
+        const card = el("div", { class: "search-card" });
+        const info = el("div", { class: "info" });
+        info.append(el("strong", {}, item.name));
+        info.append(el("p", { class: "small muted" }, item.description || ""));
+        const btns = el("div", { class: "links" });
+        if (item.category === "experience") {
+          btns.append(el("a", { class: "btn", href: L.forItem(item, item.place)[0]?.url || "#", target: "_blank" }, "Book"));
+        }
+        if (item.place) {
+          btns.append(el("a", { class: "btn", href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.place)}`, target: "_blank" }, "Map"));
+          btns.append(el("a", { class: "btn", href: `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(item.place)}`, target: "_blank" }, "Hotels"));
+        }
+        info.append(btns);
+        card.append(info);
+        $("chat-cards").append(card);
+      }
+      status("search", "");
+    } catch (err) {
+      status("search", err.message);
+    }
+  }
+  $("search-go").disabled = false;
+});
+
+$("search-query").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("search-go").click();
 });
 
 // ---------- helpers ----------

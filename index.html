@@ -13,6 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="FFT">
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/exifr@7/dist/lite.umd.js" defer></script>
+  <script type="module" src="social.js"></script>
   <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -20,6 +21,7 @@
   <nav class="tabs">
     <a href="#new" data-tab="new">＋ New</a>
     <a href="#posts" data-tab="posts">My posts</a>
+    <a href="#search" data-tab="search">Search</a>
     <a href="#settings" data-tab="settings">Settings</a>
   </nav>
 
@@ -31,12 +33,30 @@
         <h1>Fun, Food &amp; Travel</h1>
         <p class="muted">Share a moment. We find the place, the gear and the bookings.</p>
       </header>
-      <label class="drop">
-        <input id="files" type="file" accept="image/*,video/*" multiple hidden>
+      <div class="drop">
         <span class="big">＋</span>
-        <span>Choose photos &amp; videos</span>
+        <div class="pick-buttons">
+          <label class="pick-btn">
+            <input id="files" type="file" accept="image/*,video/*" multiple hidden>
+            <span>Choose from gallery</span>
+          </label>
+          <label class="pick-btn">
+            <input id="camera-photo" type="file" accept="image/*" capture="environment" hidden>
+            <span>Take a photo</span>
+          </label>
+          <label class="pick-btn">
+            <input id="camera-video" type="file" accept="video/*" capture="environment" hidden>
+            <span>Record a video</span>
+          </label>
+        </div>
         <small class="muted">Only the items you pick are used. Nothing else in your library is read.</small>
-      </label>
+      </div>
+      <div class="social-import">
+        <label class="field">Or paste a link from social media
+          <input id="social-link" type="url" placeholder="https://youtube.com/watch?v=... or instagram.com/p/...">
+        </label>
+        <button id="import-link" class="ghost small">Import link</button>
+      </div>
       <div id="thumbs" class="thumbs"></div>
       <label class="field">Tags or notes (optional)
         <input id="tags" type="text" placeholder="e.g. #positano #gelato sunset boat trip">
@@ -75,6 +95,7 @@
 
       <div class="row">
         <button id="back" class="ghost">Back</button>
+        <button id="share-preview" class="ghost">Share preview</button>
         <button id="publish" class="primary">Save post</button>
       </div>
       <p id="review-status" class="status"></p>
@@ -91,11 +112,31 @@
   <!-- ===== One post ===== -->
   <section id="view-post" class="post" hidden>
     <div id="post-body"></div>
+    <p class="share-heading">Share to your favorite platforms</p>
+    <div id="post-share-bar" class="share-bar"></div>
     <div class="row">
       <button id="share-post" class="primary">Share</button>
       <button id="delete-post" class="ghost">Delete</button>
     </div>
     <p id="post-status" class="status"></p>
+  </section>
+
+  <!-- ===== Search & Chat ===== -->
+  <section id="view-search" hidden>
+    <h1>Search</h1>
+    <div class="search-input-row">
+      <input id="search-query" type="text"
+        placeholder='e.g. "scuba diving in cool weather" or "yellow watch"'>
+      <button id="search-go" class="primary small">Search</button>
+    </div>
+    <p class="muted small">Search your posts or ask about trips, products, and destinations.</p>
+    <div id="search-results" class="search-grid"></div>
+    <div id="search-chat" hidden>
+      <h2>Results</h2>
+      <div id="chat-response" class="chat-response"></div>
+      <div id="chat-cards" class="search-grid"></div>
+    </div>
+    <p id="search-status" class="status"></p>
   </section>
 
   <!-- ===== Settings ===== -->
