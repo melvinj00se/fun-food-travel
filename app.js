@@ -74,38 +74,57 @@ $("save-settings").addEventListener("click", () => {
   if (key) location.hash = "#new";
 });
 
-// ---------- install prompt (Android) ----------
+// ---------- install prompt (Android + iPhone) ----------
 
 let deferredInstallPrompt = null;
+const isStandalone = window.matchMedia("(display-mode: standalone)").matches
+  || window.navigator.standalone === true;
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const isAndroid = /Android/.test(navigator.userAgent);
+const bannerDismissed = () => { try { return localStorage.getItem("fft-install-dismissed"); } catch { return null; } };
+
+function showInstallBanner() {
+  if (isStandalone || bannerDismissed()) return;
+  const banner = $("install-banner");
+  if (!banner) return;
+  if (isIOS) {
+    $("install-hint").textContent = "Tap the Share button ⬆ then \"Add to Home Screen\"";
+    $("install-action").textContent = "How";
+    $("install-action").addEventListener("click", () => {
+      alert("In Safari:\n1. Tap the Share button (⬆) at the bottom\n2. Scroll down and tap \"Add to Home Screen\"\n3. Tap \"Add\"\n\nThe app will appear on your Home Screen.");
+    });
+  } else if (deferredInstallPrompt) {
+    $("install-action").addEventListener("click", async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      banner.hidden = true;
+    });
+  } else if (isAndroid) {
+    $("install-hint").textContent = "Tap ⋮ menu then \"Add to Home screen\" or \"Install app\"";
+    $("install-action").textContent = "Got it";
+    $("install-action").addEventListener("click", () => { banner.hidden = true; });
+  } else {
+    return;
+  }
+  $("install-dismiss").addEventListener("click", () => {
+    banner.hidden = true;
+    try { localStorage.setItem("fft-install-dismissed", "1"); } catch {}
+  });
+  banner.hidden = false;
+}
 
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
-  showInstallButton();
+  showInstallBanner();
 });
-
-function showInstallButton() {
-  const existing = $("install-btn");
-  if (existing) return;
-  const btn = document.createElement("button");
-  btn.id = "install-btn";
-  btn.className = "primary";
-  btn.textContent = "Install Fun, Food & Travel";
-  btn.addEventListener("click", async () => {
-    if (!deferredInstallPrompt) return;
-    deferredInstallPrompt.prompt();
-    await deferredInstallPrompt.userChoice;
-    deferredInstallPrompt = null;
-    btn.remove();
-  });
-  const target = $("view-settings").querySelector("h2:last-of-type");
-  if (target) target.before(btn);
-}
 
 window.addEventListener("appinstalled", () => {
   deferredInstallPrompt = null;
-  const btn = $("install-btn");
-  if (btn) btn.remove();
+  const banner = $("install-banner");
+  if (banner) banner.hidden = true;
 });
 
 // ---------- audio extraction ----------
@@ -162,7 +181,7 @@ function route() {
   for (const a of document.querySelectorAll(".tabs a")) {
     a.classList.toggle("active", a.dataset.tab === (view === "post" ? "posts" : view));
   }
-  if (view === "settings") { fillSettingsForm(); if (deferredInstallPrompt) showInstallButton(); }
+  if (view === "settings") fillSettingsForm();
   if (view === "posts") renderPostList();
   if (view === "post") renderPost(id);
   if (view === "search") initSearch();
@@ -639,7 +658,7 @@ function updatePostShareBar() {
   if (!bar || !currentPost) return;
   bar.innerHTML = "";
   const text = shareText(currentPost);
-  bar.append(renderShareBar(text, ""));
+  bar.append(renderShareBar(text));
 }
 
 // ---------- social link import ----------
@@ -778,3 +797,4 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch((err) => console.warn("offline cache unavailable", err));
 }
 route();
+showInstallBanner();

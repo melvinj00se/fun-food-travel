@@ -18,20 +18,43 @@
 </head>
 <body>
 <main>
+  <div id="install-banner" class="install-banner" hidden>
+    <div class="ib-text">
+      <div class="ib-title">Install the app</div>
+      <div class="ib-sub" id="install-hint">Add to your Home Screen for the best experience</div>
+    </div>
+    <button id="install-action">Install</button>
+    <button class="ib-close" id="install-dismiss" aria-label="Dismiss">&times;</button>
+  </div>
+
   <nav class="tabs">
-    <a href="#new" data-tab="new">＋ New</a>
-    <a href="#posts" data-tab="posts">My posts</a>
-    <a href="#search" data-tab="search">Search</a>
-    <a href="#settings" data-tab="settings">Settings</a>
+    <a href="#new" data-tab="new">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      <span class="tab-label">New</span>
+    </a>
+    <a href="#posts" data-tab="posts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span class="tab-label">Posts</span>
+    </a>
+    <a href="#search" data-tab="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span class="tab-label">Search</span>
+    </a>
+    <a href="#settings" data-tab="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span class="tab-label">Settings</span>
+    </a>
   </nav>
 
   <!-- ===== New post ===== -->
   <section id="view-new" hidden>
     <!-- Step 1: pick -->
     <div id="step-pick">
-      <header class="top">
-        <h1>Fun, Food &amp; Travel</h1>
-        <p class="muted">Share a moment. We find the place, the gear and the bookings.</p>
+      <header class="top-bar">
+        <div>
+          <h1>Fun, Food &amp; Travel</h1>
+          <p class="subtitle">Share a moment. AI finds the place, gear &amp; bookings.</p>
+        </div>
       </header>
       <div class="drop">
         <span class="big">＋</span>
