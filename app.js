@@ -81,17 +81,56 @@ const isStandalone = window.matchMedia("(display-mode: standalone)").matches
   || window.navigator.standalone === true;
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 const isAndroid = /Android/.test(navigator.userAgent);
+const isIOSSafari = isIOS && typeof navigator.standalone !== "undefined"
+  && !/CriOS|FxiOS|EdgiOS|FBAN|FBAV|Instagram|WhatsApp|GSA\//.test(navigator.userAgent);
+const isInAppBrowser = isIOS && !isIOSSafari;
 const bannerDismissed = () => { try { return localStorage.getItem("fft-install-dismissed"); } catch { return null; } };
+
+function showInstallGuide(html) {
+  const guide = $("install-guide");
+  $("install-guide-content").innerHTML = html;
+  guide.hidden = false;
+  $("install-guide-close").onclick = () => { guide.hidden = true; };
+}
 
 function showInstallBanner() {
   if (isStandalone || bannerDismissed()) return;
   const banner = $("install-banner");
   if (!banner) return;
-  if (isIOS) {
-    $("install-hint").textContent = "Tap the Share button ⬆ then \"Add to Home Screen\"";
-    $("install-action").textContent = "How";
+
+  if (isIOS && isInAppBrowser) {
+    $("install-hint").textContent = "Open this page in Safari to install";
+    $("install-action").textContent = "Copy link";
+    $("install-action").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(location.href);
+        showInstallGuide(
+          `<p class="ig-step"><strong>Link copied!</strong></p>
+           <p class="ig-step">1. Open <strong>Safari</strong> on your iPhone</p>
+           <p class="ig-step">2. Tap the address bar and <strong>paste</strong> the link</p>
+           <p class="ig-step">3. Tap the <strong>Share button</strong> <span class="ig-icon">⬆︎</span> at the bottom</p>
+           <p class="ig-step">4. Scroll down and tap <strong>“Add to Home Screen”</strong></p>
+           <p class="ig-step">5. Tap <strong>“Add”</strong></p>`
+        );
+      } catch {
+        showInstallGuide(
+          `<p class="ig-step">Copy this link and open it in <strong>Safari</strong>:</p>
+           <p class="ig-link">${location.href}</p>
+           <p class="ig-step">Then: <strong>Share</strong> <span class="ig-icon">⬆︎</span> → <strong>“Add to Home Screen”</strong> → <strong>“Add”</strong></p>`
+        );
+      }
+    });
+  } else if (isIOS) {
+    $("install-hint").textContent = 'Tap Share ⬆︎ then "Add to Home Screen"';
+    $("install-action").textContent = "Show me";
     $("install-action").addEventListener("click", () => {
-      alert("In Safari:\n1. Tap the Share button (⬆) at the bottom\n2. Scroll down and tap \"Add to Home Screen\"\n3. Tap \"Add\"\n\nThe app will appear on your Home Screen.");
+      showInstallGuide(
+        `<p class="ig-step">1. Tap the <strong>Share button</strong> <span class="ig-icon">⬆︎</span> at the bottom of Safari</p>
+         <p class="ig-step">2. Scroll down the share sheet</p>
+         <p class="ig-step">3. Tap <strong>“Add to Home Screen”</strong></p>
+         <p class="ig-step">4. Tap <strong>“Add”</strong> in the top right</p>
+         <p class="ig-done">The app icon will appear on your Home Screen!</p>`
+      );
     });
   } else if (deferredInstallPrompt) {
     $("install-action").addEventListener("click", async () => {
@@ -110,6 +149,7 @@ function showInstallBanner() {
   }
   $("install-dismiss").addEventListener("click", () => {
     banner.hidden = true;
+    $("install-guide").hidden = true;
     try { localStorage.setItem("fft-install-dismissed", "1"); } catch {}
   });
   banner.hidden = false;
