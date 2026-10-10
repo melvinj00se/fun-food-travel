@@ -494,11 +494,13 @@ $("publish").addEventListener("click", async () => {
       .toDataURL("image/jpeg", 0.8);
 
     const id = crypto.randomUUID();
+    const sourceUrl = $("social-link").value.trim() || extractUrlFromTags($("tags").value);
     await db.savePost({
       id,
       created: Date.now(),
       caption: $("caption").value.trim(),
       place: $("show-place").checked ? $("place").value.trim() : "",
+      sourceUrl: sourceUrl || "",
       items: [...collectItems("items"), ...collectItems("nearby")],
       news: [...$("local").children]
         .filter((li) => li.querySelector(".keep").checked)
@@ -515,6 +517,11 @@ $("publish").addEventListener("click", async () => {
     $("publish").disabled = false;
   }
 });
+
+function extractUrlFromTags(text) {
+  const m = text.match(/https?:\/\/\S+/);
+  return m ? m[0] : "";
+}
 
 function resetNew() {
   frames = []; picked = []; gps = null; analysis = null; audioData = null;
@@ -589,6 +596,10 @@ async function renderPost(id) {
   if (p.media.length > 1) body.append(el("p", { class: "gallery-count" }, `${p.media.length} photos & videos — swipe`));
 
   body.append(el("h1", {}, p.caption));
+  if (p.sourceUrl) {
+    const srcLink = el("a", { href: p.sourceUrl, target: "_blank", rel: "noopener", class: "source-link" }, `🔗 ${p.sourceUrl}`);
+    body.append(el("p", { class: "source" }, srcLink));
+  }
   if (p.place) {
     body.append(el("p", { class: "place" }, `📍 ${p.place}`));
     body.append(linkButtons(L.forPlace(p.place), "explore"));
@@ -636,6 +647,7 @@ async function renderPost(id) {
 function shareText(p) {
   const L = links();
   const lines = [p.caption];
+  if (p.sourceUrl) lines.push("", `🔗 ${p.sourceUrl}`);
   if (p.place) lines.push(`📍 ${p.place}`);
   for (const [heading, cat, sources] of POST_SECTIONS) {
     const items = p.items.filter((i) => i.category === cat && sources.includes(i.source || "seen"));
@@ -668,7 +680,14 @@ $("share-post").addEventListener("click", async () => {
   if (!p) return;
   const text = shareText(p);
   const shareableMedia = p.media.filter((m) => m.blob.size < 20 * 1024 * 1024);
-  const files = shareableMedia.map((m) => new File([m.blob], m.name, { type: m.type }));
+  let files = shareableMedia.map((m) => new File([m.blob], m.name, { type: m.type }));
+  if (!files.length && p.cover) {
+    try {
+      const resp = await fetch(p.cover);
+      const blob = await resp.blob();
+      files = [new File([blob], "cover.jpg", { type: "image/jpeg" })];
+    } catch {}
+  }
   try {
     if (files.length && navigator.canShare?.({ files, text })) {
       await navigator.share({ files, text });
@@ -698,7 +717,7 @@ function updatePostShareBar() {
   if (!bar || !currentPost) return;
   bar.innerHTML = "";
   const text = shareText(currentPost);
-  bar.append(renderShareBar(text));
+  bar.append(renderShareBar(text, currentPost.sourceUrl, currentPost.cover));
 }
 
 // ---------- social link import ----------

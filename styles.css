@@ -217,6 +217,8 @@ button:disabled { opacity: 0.4; cursor: default; }
 /* ===== Post page ===== */
 .post h1 { font-size: 1.2rem; margin: 12px 0 4px; }
 .post .place { color: var(--muted); margin-top: 0; font-size: 0.9rem; }
+.post .source { margin: 4px 0; font-size: 0.85rem; word-break: break-all; }
+.source-link { color: var(--accent); }
 .cards { list-style: none; padding: 0; display: grid; gap: 6px; }
 .cards .card { display: flex; flex-direction: column; gap: 6px; }
 .cards p { margin: 4px 0 0; color: var(--muted); font-size: 0.85rem; }
