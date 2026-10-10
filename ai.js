@@ -157,9 +157,7 @@ export async function analyze(apiKey, frames, tags, gps, audio) {
   });
 
   if (audio) {
-    const audioB64 = uint8ToBase64(audio);
-    content.push({ type: "input_audio", source: { type: "base64", media_type: "audio/wav", data: audioB64 } });
-    content.push({ type: "text", text: "Audio from the video is included above. Listen for spoken language, place names, announcements, ambient sounds, and any brand/product mentions." });
+    content.push({ type: "text", text: "Note: audio was extracted from the video but cannot be sent directly. Use visual cues (signage, text, landmarks, menus) and the tags/GPS to identify the location and items." });
   }
 
   const context = [`Creator tags/notes: ${tags.trim() || "(none)"}`];

@@ -1,41 +1,52 @@
-/* Instagram-inspired dark-first design */
+/* I2P-inspired design: dark panels, gradient buttons, polished interactions */
 :root {
   --bg: #fafafa;
   --surface: #ffffff;
-  --surface2: #f5f5f5;
-  --text: #262626;
-  --muted: #8e8e8e;
-  --border: #dbdbdb;
+  --surface2: #f0f0f0;
+  --surface3: #e8e8e8;
+  --text: #1a1a2e;
+  --muted: #6b7280;
+  --border: #e5e7eb;
   --accent: #e8590c;
   --accent2: #ff7a2e;
   --accent-text: #ffffff;
-  --gradient: linear-gradient(135deg, #e8590c, #ff7a2e, #f77737);
+  --gradient: linear-gradient(135deg, #e8590c, #f77737, #ff9a55);
+  --gradient-hover: linear-gradient(135deg, #d14e0a, #e06a2c, #ff8844);
+  --success: #16a34a;
+  --panel-bg: #1e1e2e;
+  --panel-text: #e0e0e0;
   --radius: 12px;
   --nav-height: 56px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #000000;
-    --surface: #121212;
-    --surface2: #1a1a1a;
-    --text: #f5f5f5;
-    --muted: #a8a8a8;
-    --border: #2a2a2a;
+    --bg: #0a0a0f;
+    --surface: #14141f;
+    --surface2: #1e1e2e;
+    --surface3: #2a2a3a;
+    --text: #f0f0f5;
+    --muted: #9ca3af;
+    --border: #2a2a3a;
     --accent: #ff7a2e;
     --accent2: #ff9a55;
     --accent-text: #000000;
+    --panel-bg: #1e1e2e;
+    --panel-text: #e0e0e0;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #000000;
-  --surface: #121212;
-  --surface2: #1a1a1a;
-  --text: #f5f5f5;
-  --muted: #a8a8a8;
-  --border: #2a2a2a;
+  --bg: #0a0a0f;
+  --surface: #14141f;
+  --surface2: #1e1e2e;
+  --surface3: #2a2a3a;
+  --text: #f0f0f5;
+  --muted: #9ca3af;
+  --border: #2a2a3a;
   --accent: #ff7a2e;
   --accent2: #ff9a55;
   --accent-text: #000000;
+  --panel-bg: #1e1e2e;
+  --panel-text: #e0e0e0;
 }
 
 * { box-sizing: border-box; margin: 0; }
@@ -59,7 +70,7 @@ a { color: var(--accent); text-decoration: none; }
 .small { font-size: 0.82rem; }
 .status { min-height: 1.4em; color: var(--muted); font-size: 0.85rem; padding: 4px 0; }
 
-/* ===== Bottom tab bar (Instagram style) ===== */
+/* ===== Bottom tab bar ===== */
 .tabs {
   display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
   background: var(--surface); border-top: 1px solid var(--border);
@@ -70,8 +81,9 @@ a { color: var(--accent); text-decoration: none; }
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
   padding: 6px 0; color: var(--muted); text-decoration: none;
   font-size: 0.65rem; font-weight: 500; letter-spacing: 0.02em;
+  transition: color 0.15s;
 }
-.tabs a.active { color: var(--text); }
+.tabs a.active { color: var(--accent); }
 .tabs a svg { width: 24px; height: 24px; }
 .tab-label { display: block; }
 
@@ -106,7 +118,7 @@ a { color: var(--accent); text-decoration: none; }
   background: none; padding: 4px; font-size: 1.2rem; opacity: 0.7; min-width: auto;
 }
 
-/* ===== Install guide (inline instructions) ===== */
+/* ===== Install guide ===== */
 .install-guide {
   margin: 0 16px 12px; padding: 16px; border-radius: var(--radius);
   background: var(--surface); border: 1px solid var(--border);
@@ -119,7 +131,7 @@ a { color: var(--accent); text-decoration: none; }
   background: var(--accent); color: #fff; font-size: 0.85rem;
   vertical-align: middle;
 }
-.ig-done { margin: 12px 0 0; font-weight: 700; color: var(--accent); font-size: 0.9rem; }
+.ig-done { margin: 12px 0 0; font-weight: 700; color: var(--success); font-size: 0.9rem; }
 .ig-link {
   margin: 8px 0; padding: 10px 14px; border-radius: 10px;
   background: var(--surface2); font-size: 0.82rem; word-break: break-all;
@@ -132,47 +144,66 @@ input[type="text"], input[type="password"], input[type="url"], textarea, select 
   width: 100%; font: inherit; font-size: 16px;
   color: var(--text); background: var(--surface2);
   border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
-input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+input:focus, textarea:focus, select:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(232, 89, 12, 0.15);
+}
 select { width: auto; padding: 6px 10px; }
 .field { display: block; margin: 14px 0 6px; font-weight: 600; font-size: 0.9rem; }
 .field input, .field select { margin-top: 6px; font-weight: 400; }
 .check { display: flex; gap: 8px; align-items: center; margin: 10px 0; font-size: 0.9rem; }
 input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
 
-/* ===== Buttons ===== */
+/* ===== Buttons (I2P style with hover/active) ===== */
 button {
   font: inherit; font-weight: 700; border-radius: 10px;
   padding: 12px 20px; border: none; cursor: pointer;
-  transition: opacity 0.15s;
+  transition: all 0.2s ease;
 }
-button:active { opacity: 0.7; }
+button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(232, 89, 12, 0.25); }
+button:active:not(:disabled) { transform: translateY(0); opacity: 0.85; box-shadow: none; }
 button:disabled { opacity: 0.4; cursor: default; }
 .primary {
   background: var(--gradient); color: #fff; width: 100%;
   border-radius: 10px; font-size: 0.95rem; letter-spacing: 0.01em;
 }
-.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 10px; }
+.primary:hover:not(:disabled) { background: var(--gradient-hover); }
+.ghost {
+  background: transparent; color: var(--text); border: 1.5px solid var(--border); border-radius: 10px;
+  transition: all 0.2s ease;
+}
+.ghost:hover:not(:disabled) {
+  border-color: var(--accent); color: var(--accent);
+  box-shadow: 0 2px 8px rgba(232, 89, 12, 0.12);
+}
 .row { display: flex; gap: 8px; align-items: center; margin-top: 14px; }
 .row.tight { margin: 6px 0; }
 .row .primary { flex: 1; }
 
-/* ===== Pick area (New post) ===== */
+/* ===== Pick area ===== */
 .drop {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 32px 16px; margin-top: 12px; text-align: center;
   border: 2px dashed var(--border); border-radius: var(--radius);
   background: var(--surface);
+  transition: border-color 0.2s;
 }
 .drop .big { font-size: 2.4rem; line-height: 1; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 .pick-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; }
 .pick-btn {
   display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px;
   border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer;
+  transition: all 0.2s ease;
 }
 .pick-btn:first-child { background: var(--gradient); color: #fff; }
+.pick-btn:first-child:hover { background: var(--gradient-hover); transform: translateY(-1px); }
 .pick-btn:nth-child(2), .pick-btn:nth-child(3) {
   background: transparent; color: var(--accent); border: 1.5px solid var(--accent);
+}
+.pick-btn:nth-child(2):hover, .pick-btn:nth-child(3):hover {
+  background: rgba(232, 89, 12, 0.08); transform: translateY(-1px);
 }
 
 .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 4px; margin-top: 12px; }
@@ -203,7 +234,7 @@ button:disabled { opacity: 0.4; cursor: default; }
   background: var(--surface2); color: var(--muted); font-weight: 600;
 }
 
-/* ===== Post gallery (full-width, edge-to-edge like Instagram) ===== */
+/* ===== Post gallery ===== */
 .gallery {
   display: flex; gap: 0; overflow-x: auto; scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch; margin: 0 -16px; background: #000;
@@ -226,9 +257,14 @@ button:disabled { opacity: 0.4; cursor: default; }
 .btn {
   display: inline-block; padding: 8px 16px; border-radius: 10px; text-decoration: none;
   background: var(--gradient); color: #fff; font-weight: 700; font-size: 0.85rem;
+  transition: all 0.2s ease;
 }
+.btn:hover { background: var(--gradient-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(232, 89, 12, 0.25); }
 .explore { margin-bottom: 8px; }
-.explore .btn { background: transparent; color: var(--accent); border: 1.5px solid var(--accent); }
+.explore .btn {
+  background: transparent; color: var(--accent); border: 1.5px solid var(--accent);
+}
+.explore .btn:hover { background: rgba(232, 89, 12, 0.08); }
 .brand { color: var(--muted); font-size: 0.82rem; }
 .src { font-style: italic; }
 .disclosure { margin-top: 24px; font-size: 0.75rem; color: var(--muted); }
@@ -241,8 +277,10 @@ button:disabled { opacity: 0.4; cursor: default; }
   padding: 8px 6px; border: none; border-radius: 12px;
   background: var(--surface2); color: var(--platform-color, var(--accent));
   cursor: pointer; font-size: 0.7rem; font-weight: 600; min-width: 56px; flex: none;
+  transition: all 0.2s ease;
 }
-.share-icon-btn:active { opacity: 0.6; }
+.share-icon-btn:hover { background: var(--surface3); transform: translateY(-2px); }
+.share-icon-btn:active { opacity: 0.6; transform: translateY(0); }
 .share-icon-btn svg { display: block; }
 .share-label { color: var(--muted); font-size: 0.62rem; font-weight: 500; }
 @media (prefers-color-scheme: dark) {
@@ -250,7 +288,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 }
 :root[data-theme="dark"] .share-icon-btn { color: var(--platform-dark-color, var(--platform-color, var(--accent))); }
 
-/* ===== Post list (My posts — grid like Instagram profile) ===== */
+/* ===== Post list (Instagram grid) ===== */
 .post-list { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin: 0 -16px; }
 .post-list li { position: relative; }
 .post-row {
@@ -269,28 +307,95 @@ button:disabled { opacity: 0.4; cursor: default; }
 .search-input-row { display: flex; gap: 8px; align-items: center; }
 .search-input-row input { flex: 1; background: var(--surface2); border-radius: 10px; }
 .search-input-row .primary { width: auto; padding: 10px 18px; flex: none; border-radius: 10px; }
-.search-grid {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 12px;
+
+/* Post select grid for "Plan similar" */
+.post-select-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 8px 0;
 }
-.search-card {
-  border-radius: var(--radius); overflow: hidden;
-  background: var(--surface); border: 1px solid var(--border);
-  text-decoration: none; color: var(--text); display: block;
+.select-card {
+  position: relative; border-radius: 8px; overflow: hidden; cursor: pointer;
+  border: 2px solid transparent; transition: border-color 0.2s, transform 0.15s;
 }
-.search-card img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
-.search-card .info { padding: 10px; }
-.search-card .info strong { font-size: 0.85rem; display: block; }
-.search-card .info .place { margin: 2px 0 0; }
-.search-card .info .links { margin-top: 6px; }
+.select-card:hover { transform: scale(1.03); }
+.select-card.selected { border-color: var(--accent); }
+.select-card.selected::after {
+  content: "✓"; position: absolute; top: 4px; right: 4px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent); color: #fff; font-size: 0.75rem;
+  display: flex; align-items: center; justify-content: center; font-weight: 700;
+}
+.select-card img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+.select-label {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 16px 4px 4px; background: linear-gradient(transparent, rgba(0,0,0,0.7));
+  color: #fff; font-size: 0.65rem; font-weight: 600; line-height: 1.2;
+}
+
+/* ===== Search results (rich layout) ===== */
+.sr-row {
+  display: flex; gap: 8px; margin: 14px 0; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+}
+.sr-frames {
+  flex: 0 0 45%; display: flex; flex-direction: column; gap: 2px;
+}
+.sr-frame { position: relative; }
+.sr-frame img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+.sr-frame-label {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 12px 4px 3px; background: linear-gradient(transparent, rgba(0,0,0,0.7));
+  color: #fff; font-size: 0.6rem; font-weight: 600;
+}
+.sr-video { flex: 1; display: flex; flex-direction: column; }
+.sr-cover {
+  width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; cursor: pointer;
+  transition: opacity 0.2s;
+}
+.sr-cover:hover { opacity: 0.85; }
+.sr-source { display: block; padding: 4px 8px; color: var(--accent); }
+.sr-meta { padding: 8px 0; }
+.sr-meta strong { font-size: 0.9rem; display: block; margin-bottom: 2px; }
+.sr-meta .btn { margin-top: 6px; display: inline-block; }
+
+/* ===== Product search results ===== */
+.product-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px; margin: 8px 0;
+}
+.product-card .price { color: var(--accent); font-weight: 700; margin: 6px 0; }
+.product-card .btn { margin-top: 6px; }
+
+/* ===== Pack your Plan ===== */
+.plan-title {
+  font-size: 1.3rem; margin: 20px 0 8px;
+  background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.plan-overview { margin: 8px 0 16px; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+.plan-section-title { font-size: 1rem; margin: 18px 0 8px; font-weight: 700; }
+.plan-items { list-style: none; padding: 0; display: grid; gap: 8px; }
+.plan-item {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px;
+}
+.plan-item-top { display: flex; justify-content: space-between; align-items: baseline; }
+.plan-price { color: var(--accent); font-weight: 700; font-size: 0.9rem; }
+.plan-item .btn { margin-top: 8px; }
+.plan-budget {
+  margin: 20px 0; padding: 14px; border-radius: var(--radius);
+  background: var(--surface2); font-weight: 700; font-size: 1rem;
+  text-align: center;
+}
 
 /* ===== Chat response ===== */
 .chat-response {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 14px; margin: 12px 0; white-space: pre-wrap; font-size: 0.88rem; line-height: 1.5;
+  background: var(--panel-bg); color: var(--panel-text); border: none; border-radius: var(--radius);
+  padding: 16px; margin: 12px 0; white-space: pre-wrap; font-size: 0.88rem; line-height: 1.6;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
 }
 
 /* ===== Button variants ===== */
 button.small, .ghost.small { padding: 8px 14px; font-size: 0.82rem; }
+.btn.small { padding: 6px 12px; font-size: 0.78rem; }
 code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 0.88rem; }
 
 /* ===== Settings ===== */

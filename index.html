@@ -153,16 +153,19 @@
     <h1>Search</h1>
     <div class="search-input-row">
       <input id="search-query" type="text"
-        placeholder='e.g. "scuba diving in cool weather" or "yellow watch"'>
+        placeholder='e.g. "yellow armani watch" or "plan a trip to Bali"'>
       <button id="search-go" class="primary small">Search</button>
     </div>
-    <p class="muted small">Search your posts or ask about trips, products, and destinations.</p>
-    <div id="search-results" class="search-grid"></div>
-    <div id="search-chat" hidden>
-      <h2>Results</h2>
-      <div id="chat-response" class="chat-response"></div>
-      <div id="chat-cards" class="search-grid"></div>
+    <p class="muted small">Search your posts, find products, or plan a trip based on your videos.</p>
+
+    <div id="search-post-select" hidden>
+      <p class="small" style="margin:12px 0 6px"><strong>Or select videos and tap:</strong></p>
+      <div id="search-post-grid" class="post-select-grid"></div>
+      <button id="plan-similar" class="primary" disabled>Plan similar travel / vacation</button>
     </div>
+
+    <div id="search-results"></div>
+    <div id="search-plan" hidden></div>
     <p id="search-status" class="status"></p>
   </section>
 

@@ -6,7 +6,7 @@ import { analyze, localInfo, DEMO_KEY } from "./ai.js";
 import { makeLinks } from "./links.js";
 import * as db from "./db.js";
 import { renderShareBar } from "./social.js";
-import { buildIndex, search as localSearch, semanticSearch } from "./search.js";
+import { buildIndex, search as localSearch, smartSearch, getPost as searchGetPost, getAllPosts } from "./search.js";
 
 const MAX_FRAMES = 12;
 const FRAMES_PER_VIDEO = 6;
@@ -495,13 +495,25 @@ $("publish").addEventListener("click", async () => {
 
     const id = crypto.randomUUID();
     const sourceUrl = $("social-link").value.trim() || extractUrlFromTags($("tags").value);
+    const collectedItems = [...collectItems("items"), ...collectItems("nearby")];
+    const itemFrames = {};
+    for (const item of collectedItems) {
+      const frameIdx = analysis?.items?.find((ai) => ai.name === item.name)?.frame_index;
+      if (frameIdx != null && frames[frameIdx]) itemFrames[item.name] = frames[frameIdx].dataUrl;
+      else if (frames[0]) itemFrames[item.name] = frames[0].dataUrl;
+    }
+    const allFrameDataUrls = frames.map((f) => f.dataUrl);
     await db.savePost({
       id,
       created: Date.now(),
       caption: $("caption").value.trim(),
       place: $("show-place").checked ? $("place").value.trim() : "",
       sourceUrl: sourceUrl || "",
-      items: [...collectItems("items"), ...collectItems("nearby")],
+      location: analysis?.location || null,
+      tags: $("tags").value.trim(),
+      items: collectedItems,
+      itemFrames,
+      allFrames: allFrameDataUrls.slice(0, 6),
       news: [...$("local").children]
         .filter((li) => li.querySelector(".keep").checked)
         .map((li) => JSON.parse(li.dataset.json)),
@@ -783,9 +795,49 @@ $("import-link").addEventListener("click", async () => {
 
 // ---------- search ----------
 
+let selectedSearchPosts = new Set();
+
 async function initSearch() {
   await buildIndex();
+  renderPostSelectGrid();
 }
+
+function renderPostSelectGrid() {
+  const grid = $("search-post-grid");
+  if (!grid) return;
+  grid.innerHTML = "";
+  const posts = getAllPosts();
+  if (!posts.length) { $("search-post-select").hidden = true; return; }
+  $("search-post-select").hidden = false;
+  for (const p of posts.slice(0, 12)) {
+    const card = el("div", { class: "select-card" });
+    if (p.cover) card.append(el("img", { src: p.cover, alt: "" }));
+    const label = el("div", { class: "select-label" });
+    label.textContent = p.caption?.slice(0, 40) || "Untitled";
+    card.append(label);
+    card.addEventListener("click", () => {
+      if (selectedSearchPosts.has(p.id)) { selectedSearchPosts.delete(p.id); card.classList.remove("selected"); }
+      else { selectedSearchPosts.add(p.id); card.classList.add("selected"); }
+      $("plan-similar").disabled = selectedSearchPosts.size === 0;
+    });
+    grid.append(card);
+  }
+}
+
+$("plan-similar").addEventListener("click", async () => {
+  if (!selectedSearchPosts.size) return;
+  $("plan-similar").disabled = true;
+  status("search", "Planning your trip based on selected videos…");
+  try {
+    const result = await smartSearch(apiKey(), "plan a vacation with all details similar to shown", [...selectedSearchPosts]);
+    renderSearchResult(result);
+    status("search", "");
+  } catch (err) {
+    status("search", err.message);
+  } finally {
+    $("plan-similar").disabled = false;
+  }
+});
 
 $("search-go").addEventListener("click", async () => {
   const query = $("search-query").value.trim();
@@ -793,54 +845,108 @@ $("search-go").addEventListener("click", async () => {
   $("search-go").disabled = true;
   status("search", "Searching…");
   $("search-results").innerHTML = "";
-  $("search-chat").hidden = true;
+  $("search-plan").hidden = true;
 
-  const results = localSearch(query);
-  if (results.length) {
-    for (const r of results.slice(0, 8)) {
-      const card = el("a", { class: "search-card", href: `#post/${r.id}` });
-      if (r.cover) card.append(el("img", { src: r.cover, alt: "" }));
-      const info = el("div", { class: "info" });
-      info.append(el("strong", {}, r.caption || "Untitled"));
-      if (r.place) info.append(el("p", { class: "place small" }, `📍 ${r.place}`));
-      card.append(info);
-      $("search-results").append(card);
-    }
-    status("search", `${results.length} post${results.length === 1 ? "" : "s"} found.`);
-  } else {
-    status("search", "No matching posts. Searching the web…");
-    try {
-      const webResults = await semanticSearch(apiKey(), query);
-      $("search-chat").hidden = false;
-      $("chat-response").innerHTML = "";
-      if (webResults.response) {
-        $("chat-response").textContent = webResults.response;
-      }
-      const L = links();
-      for (const item of webResults.suggestions || []) {
-        const card = el("div", { class: "search-card" });
-        const info = el("div", { class: "info" });
-        info.append(el("strong", {}, item.name));
-        info.append(el("p", { class: "small muted" }, item.description || ""));
-        const btns = el("div", { class: "links" });
-        if (item.category === "experience") {
-          btns.append(el("a", { class: "btn", href: L.forItem(item, item.place)[0]?.url || "#", target: "_blank" }, "Book"));
-        }
-        if (item.place) {
-          btns.append(el("a", { class: "btn", href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.place)}`, target: "_blank" }, "Map"));
-          btns.append(el("a", { class: "btn", href: `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(item.place)}`, target: "_blank" }, "Hotels"));
-        }
-        info.append(btns);
-        card.append(info);
-        $("chat-cards").append(card);
-      }
-      status("search", "");
-    } catch (err) {
-      status("search", err.message);
-    }
+  try {
+    const result = await smartSearch(apiKey(), query, null);
+    renderSearchResult(result);
+    status("search", "");
+  } catch (err) {
+    status("search", err.message);
+  } finally {
+    $("search-go").disabled = false;
   }
-  $("search-go").disabled = false;
 });
+
+function renderSearchResult(result) {
+  const container = $("search-results");
+  container.innerHTML = "";
+  $("search-plan").hidden = true;
+
+  if (result.type === "results") {
+    const L = links();
+    for (const post of result.posts) {
+      const row = el("div", { class: "sr-row" });
+      const left = el("div", { class: "sr-frames" });
+      const itemFrameEntries = Object.entries(post.itemFrames || {}).slice(0, 3);
+      if (itemFrameEntries.length) {
+        for (const [name, dataUrl] of itemFrameEntries) {
+          const frame = el("div", { class: "sr-frame" });
+          frame.append(el("img", { src: dataUrl, alt: name }));
+          frame.append(el("span", { class: "sr-frame-label" }, name));
+          left.append(frame);
+        }
+      } else if (post.allFrames?.length) {
+        for (const dataUrl of post.allFrames.slice(0, 3)) {
+          const frame = el("div", { class: "sr-frame" });
+          frame.append(el("img", { src: dataUrl, alt: "" }));
+          left.append(frame);
+        }
+      }
+      const right = el("div", { class: "sr-video" });
+      if (post.cover) {
+        const coverImg = el("img", { src: post.cover, alt: post.caption || "", class: "sr-cover" });
+        coverImg.addEventListener("click", () => { location.hash = `#post/${post.id}`; });
+        right.append(coverImg);
+      }
+      if (post.sourceUrl) right.append(el("a", { href: post.sourceUrl, target: "_blank", class: "sr-source small" }, "🔗 Watch original"));
+      const meta = el("div", { class: "sr-meta" });
+      meta.append(el("strong", {}, post.caption || "Untitled"));
+      if (post.place) meta.append(el("p", { class: "small muted" }, `📍 ${post.place}`));
+      const viewBtn = el("a", { href: `#post/${post.id}`, class: "btn small" }, "View full post");
+      meta.append(viewBtn);
+      row.append(left, right);
+      container.append(row, meta);
+    }
+    if (!result.posts.length) status("search", "No matching posts found. Try a different search.");
+  } else if (result.type === "plan") {
+    renderPlan(result.plan, result.posts);
+  } else if (result.type === "products") {
+    for (const item of result.items || []) {
+      const card = el("div", { class: "product-card" });
+      card.append(el("strong", {}, item.name));
+      if (item.brand) card.append(el("span", { class: "brand" }, ` by ${item.brand}`));
+      card.append(el("p", { class: "small" }, item.description || ""));
+      if (item.price) card.append(el("p", { class: "price" }, item.price));
+      if (item.link) card.append(el("a", { href: item.link, target: "_blank", class: "btn small" }, "Buy / View"));
+      container.append(card);
+    }
+  } else if (result.type === "text") {
+    const resp = el("div", { class: "chat-response" });
+    resp.textContent = result.response;
+    container.append(resp);
+  }
+}
+
+function renderPlan(plan, posts) {
+  const container = $("search-plan");
+  container.innerHTML = "";
+  container.hidden = false;
+
+  container.append(el("h2", { class: "plan-title" }, "🎒 Pack your Plan"));
+  if (plan.destination) container.append(el("h3", {}, plan.destination));
+  if (plan.overview) container.append(el("p", { class: "plan-overview" }, plan.overview));
+
+  const L = links();
+  for (const section of plan.sections || []) {
+    container.append(el("h3", { class: "plan-section-title" }, section.title));
+    const list = el("ul", { class: "plan-items" });
+    for (const item of section.items || []) {
+      const li = el("li", { class: "plan-item" });
+      const top = el("div", { class: "plan-item-top" });
+      top.append(el("strong", {}, item.name));
+      if (item.price) top.append(el("span", { class: "plan-price" }, ` ${item.price}`));
+      li.append(top);
+      if (item.description) li.append(el("p", { class: "small muted" }, item.description));
+      if (item.link) li.append(el("a", { href: item.link, target: "_blank", rel: "noopener", class: "btn small" }, "Book / Buy"));
+      list.append(li);
+    }
+    container.append(list);
+  }
+  if (plan.budget) {
+    container.append(el("div", { class: "plan-budget" }, `💰 Estimated budget: ${plan.budget}`));
+  }
+}
 
 $("search-query").addEventListener("keydown", (e) => {
   if (e.key === "Enter") $("search-go").click();
