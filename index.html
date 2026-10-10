@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Fun, Food &amp; Travel</title>
-  <meta name="theme-color" content="#e8590c">
+  <meta name="theme-color" content="#e84393">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-180.png">
@@ -18,19 +18,6 @@
 </head>
 <body>
 <main>
-  <div id="install-banner" class="install-banner" hidden>
-    <div class="ib-text">
-      <div class="ib-title">Install the app</div>
-      <div class="ib-sub" id="install-hint">Add to your Home Screen for the best experience</div>
-    </div>
-    <button id="install-action">Install</button>
-    <button class="ib-close" id="install-dismiss" aria-label="Dismiss">&times;</button>
-  </div>
-  <div id="install-guide" class="install-guide" hidden>
-    <div id="install-guide-content"></div>
-    <button id="install-guide-close" class="ghost small">Got it</button>
-  </div>
-
   <nav class="tabs">
     <a href="#new" data-tab="new">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
@@ -153,10 +140,10 @@
     <h1>Search</h1>
     <div class="search-input-row">
       <input id="search-query" type="text"
-        placeholder='e.g. "yellow armani watch" or "plan a trip to Bali"'>
+        placeholder='e.g. "plan activities like my videos around my location"'>
       <button id="search-go" class="primary small">Search</button>
     </div>
-    <p class="muted small">Search your posts, find products, or plan a trip based on your videos.</p>
+    <p class="muted small">Search posts, find products, or type "plan a trip like my videos around my current location".</p>
 
     <div id="search-post-select" hidden>
       <p class="small" style="margin:12px 0 6px"><strong>Or select videos and tap:</strong></p>

@@ -215,6 +215,7 @@ function encodeWav(samples, sampleRate) {
 function route() {
   for (const url of objectUrls) URL.revokeObjectURL(url);
   objectUrls = [];
+  removeFabShare();
   let [view, id] = (location.hash.slice(1) || "new").split("/");
   if (!apiKey() && view !== "settings") view = "settings";
   for (const v of ["new", "posts", "post", "search", "settings"]) $(`view-${v}`).hidden = v !== view;
@@ -740,7 +741,7 @@ function makeLinkPlaceholder(url, host) {
   const ctx = c.getContext("2d");
   ctx.fillStyle = "#fffaf5";
   ctx.fillRect(0, 0, 640, 480);
-  ctx.fillStyle = "#e8590c";
+  ctx.fillStyle = "#e84393";
   ctx.font = "bold 28px sans-serif";
   ctx.textAlign = "center";
   ctx.fillText(host, 320, 200);
@@ -793,6 +794,52 @@ $("import-link").addEventListener("click", async () => {
   }
 });
 
+// ---------- geolocation for "around my location" ----------
+
+const LOCATION_KEYWORDS = /\b(my location|near me|around me|current location|my area|nearby|close to me|where i am)\b/i;
+
+function queryNeedsLocation(query) {
+  return LOCATION_KEYWORDS.test(query);
+}
+
+function getUserLocation() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: +pos.coords.latitude.toFixed(4), lon: +pos.coords.longitude.toFixed(4) }),
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  });
+}
+
+// ---------- floating share button for plans ----------
+
+let fabShareBtn = null;
+
+function showFabShare(planText) {
+  removeFabShare();
+  fabShareBtn = el("button", { class: "fab-share" });
+  fabShareBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>Share`;
+  fabShareBtn.addEventListener("click", async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Pack your Plan", text: planText });
+      } else {
+        await navigator.clipboard.writeText(planText);
+        status("search", "Plan copied to clipboard!");
+      }
+    } catch (err) {
+      if (err.name !== "AbortError") status("search", `Couldn't share: ${err.message}`);
+    }
+  });
+  document.body.append(fabShareBtn);
+}
+
+function removeFabShare() {
+  if (fabShareBtn) { fabShareBtn.remove(); fabShareBtn = null; }
+}
+
 // ---------- search ----------
 
 let selectedSearchPosts = new Set();
@@ -827,9 +874,25 @@ function renderPostSelectGrid() {
 $("plan-similar").addEventListener("click", async () => {
   if (!selectedSearchPosts.size) return;
   $("plan-similar").disabled = true;
-  status("search", "Planning your trip based on selected videos…");
+  removeFabShare();
+  const query = $("search-query").value.trim() || "plan a vacation with all details similar to shown";
+
+  let userLocation = null;
+  if (queryNeedsLocation(query)) {
+    status("search", "Getting your location…");
+    userLocation = await getUserLocation();
+    if (!userLocation) {
+      status("search", "Couldn't get your location. Please enable location access and try again.");
+      $("plan-similar").disabled = false;
+      return;
+    }
+    status("search", "Planning around your location…");
+  } else {
+    status("search", "Planning your trip based on selected videos…");
+  }
+
   try {
-    const result = await smartSearch(apiKey(), "plan a vacation with all details similar to shown", [...selectedSearchPosts]);
+    const result = await smartSearch(apiKey(), query, [...selectedSearchPosts], userLocation);
     renderSearchResult(result);
     status("search", "");
   } catch (err) {
@@ -843,12 +906,26 @@ $("search-go").addEventListener("click", async () => {
   const query = $("search-query").value.trim();
   if (!query) return;
   $("search-go").disabled = true;
-  status("search", "Searching…");
   $("search-results").innerHTML = "";
   $("search-plan").hidden = true;
+  removeFabShare();
+
+  let userLocation = null;
+  if (queryNeedsLocation(query)) {
+    status("search", "Getting your location…");
+    userLocation = await getUserLocation();
+    if (!userLocation) {
+      status("search", "Couldn't get your location. Please enable location access and try again.");
+      $("search-go").disabled = false;
+      return;
+    }
+    status("search", "Searching around your location…");
+  } else {
+    status("search", "Searching…");
+  }
 
   try {
-    const result = await smartSearch(apiKey(), query, null);
+    const result = await smartSearch(apiKey(), query, null, userLocation);
     renderSearchResult(result);
     status("search", "");
   } catch (err) {
@@ -928,8 +1005,13 @@ function renderPlan(plan, posts) {
   if (plan.overview) container.append(el("p", { class: "plan-overview" }, plan.overview));
 
   const L = links();
+  const shareLines = ["🎒 Pack your Plan"];
+  if (plan.destination) shareLines.push(plan.destination);
+  if (plan.overview) shareLines.push("", plan.overview);
+
   for (const section of plan.sections || []) {
     container.append(el("h3", { class: "plan-section-title" }, section.title));
+    shareLines.push("", `--- ${section.title} ---`);
     const list = el("ul", { class: "plan-items" });
     for (const item of section.items || []) {
       const li = el("li", { class: "plan-item" });
@@ -940,12 +1022,19 @@ function renderPlan(plan, posts) {
       if (item.description) li.append(el("p", { class: "small muted" }, item.description));
       if (item.link) li.append(el("a", { href: item.link, target: "_blank", rel: "noopener", class: "btn small" }, "Book / Buy"));
       list.append(li);
+      let line = `• ${item.name}`;
+      if (item.price) line += ` — ${item.price}`;
+      if (item.link) line += ` ${item.link}`;
+      shareLines.push(line);
     }
     container.append(list);
   }
   if (plan.budget) {
     container.append(el("div", { class: "plan-budget" }, `💰 Estimated budget: ${plan.budget}`));
+    shareLines.push("", `💰 Estimated budget: ${plan.budget}`);
   }
+  shareLines.push("", "Created with Fun, Food & Travel");
+  showFabShare(shareLines.join("\n"));
 }
 
 $("search-query").addEventListener("keydown", (e) => {
@@ -962,4 +1051,3 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch((err) => console.warn("offline cache unavailable", err));
 }
 route();
-showInstallBanner();

@@ -44,7 +44,7 @@ export function getAllPosts() {
   return postCache;
 }
 
-export async function smartSearch(apiKey, query, selectedPostIds) {
+export async function smartSearch(apiKey, query, selectedPostIds, userLocation) {
   if (apiKey === DEMO_KEY) return demoSearch(query);
 
   const localResults = search(query);
@@ -52,17 +52,24 @@ export async function smartSearch(apiKey, query, selectedPostIds) {
 
   if (selectedPostIds?.length) {
     const selected = selectedPostIds.map((id) => getPost(id)).filter(Boolean);
-    return planFromPosts(apiKey, selected, query);
+    return planFromPosts(apiKey, selected, query, userLocation);
+  }
+
+  if (userLocation) {
+    const allPosts = getAllPosts();
+    if (allPosts.length) {
+      return planFromPosts(apiKey, allPosts.slice(0, 6), query, userLocation);
+    }
   }
 
   if (matchedPosts.length) {
     return { type: "results", posts: matchedPosts, query };
   }
 
-  return planFromQuery(apiKey, query);
+  return planFromQuery(apiKey, query, userLocation);
 }
 
-async function planFromPosts(apiKey, posts, query) {
+async function planFromPosts(apiKey, posts, query, userLocation) {
   const context = posts.map((p) => ({
     caption: p.caption,
     place: p.place,
@@ -71,15 +78,18 @@ async function planFromPosts(apiKey, posts, query) {
   }));
 
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  const locationContext = userLocation
+    ? `\n\nIMPORTANT: The user's current GPS location is approximately ${userLocation.lat}, ${userLocation.lon}. They want activities, food, experiences, and products SIMILAR to what's shown in these posts but available NEAR THEIR CURRENT LOCATION. First check if any of the post content matches their area. Then search the web for similar experiences, restaurants, activities, hotels, and products near their coordinates. The plan should be centered around their current location, not the original post locations.`
+    : "";
   const prompt = `Based on these travel/experience posts, create a complete vacation/experience plan.
 
 Posts: ${JSON.stringify(context)}
 
-User request: "${query}"
+User request: "${query}"${locationContext}
 
 Create a detailed "Pack your Plan" with these sections, using web search to find current prices and booking links:
 1. Destination overview
-2. Flights & getting there
+2. ${userLocation ? "Getting around locally" : "Flights & getting there"}
 3. Where to stay (hotels with links)
 4. Things to do (activities, tours with links)
 5. Where to eat (restaurants)
@@ -118,10 +128,13 @@ Reply ONLY with JSON: {"plan": {"destination": "...", "overview": "...", "sectio
   return { type: "plan", plan: { destination: "Your trip", overview: text, sections: [], budget: "" }, posts, query };
 }
 
-async function planFromQuery(apiKey, query) {
+async function planFromQuery(apiKey, query, userLocation) {
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  const locationContext = userLocation
+    ? `\n\nThe user's current GPS location is approximately ${userLocation.lat}, ${userLocation.lon}. Focus results around this location.`
+    : "";
 
-  const prompt = `User is searching for: "${query}"
+  const prompt = `User is searching for: "${query}"${locationContext}
 
 Search the web and find relevant results. If this is about a product (like a watch, clothing, gear), find 3 real options with images, prices, and buy links. If this is about travel or experiences, create a "Pack your Plan" travel plan.
 
