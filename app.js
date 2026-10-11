@@ -13,7 +13,7 @@ const FRAMES_PER_VIDEO = 6;
 const MAX_SIDE = 1280;
 const GALLERY_SIDE = 2048;
 const COVER_SIDE = 600;
-const MAX_VIDEO_MB = 500;
+const MAX_VIDEO_MB = 2048;
 
 const VIDEO_TYPES = { mov: "video/quicktime", mp4: "video/mp4", m4v: "video/mp4", webm: "video/webm" };
 const BADGES = { seen: "In your post", suggested: "Pack for this trip", nearby: "Nearby" };
@@ -363,7 +363,7 @@ async function drawImage(blob, maxSide) {
   }
 }
 
-function waitFor(el, event, ms = 15000) {
+function waitFor(el, event, ms = 60000) {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error(`timeout waiting for ${event}`)), ms);
     el.addEventListener(event, () => { clearTimeout(t); resolve(); }, { once: true });
@@ -378,8 +378,9 @@ async function sampleVideo(file, n) {
   v.playsInline = true;
   v.preload = "auto";
   v.src = url;
+  const loadTimeout = Math.max(60000, file.size / 50000);
   try {
-    const loaded = waitFor(v, "loadeddata");
+    const loaded = waitFor(v, "loadeddata", loadTimeout);
     v.load();
     await loaded;
     const out = [];
