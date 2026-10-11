@@ -88,6 +88,23 @@ $("save-settings").addEventListener("click", async () => {
   if (key) location.hash = "#home";
 });
 
+$("sync-cloud").addEventListener("click", async () => {
+  if (!cloud.isConfigured()) return status("settings", "Set up Supabase URL and key above first, then Save.");
+  $("sync-cloud").disabled = true;
+  status("settings", "Syncing all local posts and plans to cloud…");
+  try {
+    const posts = await db.listPosts();
+    for (const p of posts) await cloud.uploadPost(p);
+    const plans = await db.listPlans();
+    for (const p of plans) await cloud.uploadPlan(p);
+    status("settings", `Synced! ${posts.length} post${posts.length !== 1 ? "s" : ""} and ${plans.length} plan${plans.length !== 1 ? "s" : ""} backed up to cloud.`);
+  } catch (err) {
+    status("settings", `Sync failed: ${err.message}`);
+  } finally {
+    $("sync-cloud").disabled = false;
+  }
+});
+
 // ---------- audio extraction ----------
 
 let audioData = null;
@@ -1305,4 +1322,19 @@ function status(step, msg) {
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch((err) => console.warn("offline cache unavailable", err));
 }
+
+async function syncAllToCloud() {
+  if (!cloud.isConfigured()) return;
+  try {
+    const posts = await db.listPosts();
+    for (const p of posts) await cloud.uploadPost(p);
+    const plans = await db.listPlans();
+    for (const p of plans) await cloud.uploadPlan(p);
+    if (posts.length || plans.length) console.log(`Cloud sync: ${posts.length} posts, ${plans.length} plans`);
+  } catch (err) {
+    console.warn("Cloud sync failed:", err);
+  }
+}
+
 route();
+syncAllToCloud();
