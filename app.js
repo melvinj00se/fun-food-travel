@@ -1134,14 +1134,16 @@ async function renderSavedPlan(id) {
   const bar = $("plan-share-bar");
   if (bar) { bar.innerHTML = ""; bar.append(renderShareBar(text, null, null)); }
 
-  // Share as text (works on all social media)
+  // Share — use clipboard on desktop, native share on mobile only
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   $("share-plan-doc").onclick = async () => {
     try {
-      if (navigator.share) {
+      if (isMobile && navigator.share) {
         await navigator.share({ title: `🎒 ${plan.destination}`, text });
       } else {
         await navigator.clipboard.writeText(text);
-        status("plan", "Plan copied to clipboard! Paste it anywhere.");
+        status("plan", "Plan copied! Use the social icons above to share on WhatsApp, Facebook, X, email, etc.");
+        $("plan-share-bar")?.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     } catch (err) {
       if (err.name !== "AbortError") status("plan", `Couldn't share: ${err.message}`);
