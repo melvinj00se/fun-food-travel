@@ -423,6 +423,39 @@ code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-s
   to { box-shadow: 0 4px 24px var(--glow-color), 0 0 40px var(--glow-color); }
 }
 
+/* ===== YouTube-style feed (Home tab) ===== */
+.feed { display: grid; gap: 16px; padding-bottom: 8px; }
+.feed-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+}
+.feed-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+.feed-card:active { transform: translateY(0); }
+.feed-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+.feed-info { padding: 10px 12px; }
+.feed-title { font-weight: 700; font-size: 0.95rem; line-height: 1.3; margin: 0 0 4px; }
+.feed-meta { color: var(--muted); font-size: 0.78rem; }
+.feed-items { color: var(--muted); font-size: 0.75rem; margin-top: 4px; }
+#home-feed-heading { margin-top: 20px; }
+
+/* ===== Plans list (Pack the Plan tab) ===== */
+.plan-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px; margin: 10px 0; cursor: pointer; transition: transform 0.15s;
+}
+.plan-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+.plan-card-title {
+  font-weight: 700; font-size: 1rem; margin: 0 0 4px;
+  background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.plan-card-overview { color: var(--muted); font-size: 0.85rem; line-height: 1.4; margin: 4px 0 8px; }
+.plan-card-date { color: var(--muted); font-size: 0.75rem; }
+.plan-card .btn { margin-top: 8px; }
+
+/* ===== Save plan button in search results ===== */
+.plan-actions { display: flex; gap: 8px; margin: 16px 0; }
+.plan-actions .primary { flex: 1; }
+
 /* ===== Settings ===== */
 #view-settings h2 { margin-top: 28px; }
 #view-settings .card { margin-bottom: 12px; }

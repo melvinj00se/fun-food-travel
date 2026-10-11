@@ -19,6 +19,10 @@
 <body>
 <main>
   <nav class="tabs">
+    <a href="#home" data-tab="home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span class="tab-label">Home</span>
+    </a>
     <a href="#new" data-tab="new">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
       <span class="tab-label">New</span>
@@ -27,15 +31,45 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
       <span class="tab-label">Posts</span>
     </a>
-    <a href="#search" data-tab="search">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <span class="tab-label">Search</span>
+    <a href="#plans" data-tab="plans">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      <span class="tab-label">Plans</span>
     </a>
     <a href="#settings" data-tab="settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
       <span class="tab-label">Settings</span>
     </a>
   </nav>
+
+  <!-- ===== Home (landing) ===== -->
+  <section id="view-home" hidden>
+    <header class="top-bar">
+      <div>
+        <h1>Fun, Food &amp; Travel</h1>
+        <p class="subtitle">Discover, plan &amp; share amazing experiences</p>
+      </div>
+    </header>
+    <div class="search-input-row" style="margin-top:8px">
+      <input id="home-search-query" type="text"
+        placeholder='e.g. "plan activities like my videos around my location"'>
+      <button id="home-search-go" class="primary small">Search</button>
+    </div>
+    <p class="muted small">Search posts, find products, or plan a trip around your current location.</p>
+
+    <div id="home-post-select" hidden>
+      <p class="small" style="margin:12px 0 6px"><strong>Select videos to plan similar travel:</strong></p>
+      <div id="home-post-grid" class="post-select-grid"></div>
+      <button id="home-plan-similar" class="primary" disabled>Plan similar travel / vacation</button>
+    </div>
+
+    <div id="home-search-results"></div>
+    <div id="home-search-plan" hidden></div>
+    <p id="home-status" class="status"></p>
+
+    <h2 id="home-feed-heading">Latest</h2>
+    <p id="home-empty" class="muted" hidden>No posts yet. Tap <strong>＋ New</strong> to add your first video or photo.</p>
+    <div id="home-feed" class="feed"></div>
+  </section>
 
   <!-- ===== New post ===== -->
   <section id="view-new" hidden>
@@ -135,25 +169,21 @@
     <p id="post-status" class="status"></p>
   </section>
 
-  <!-- ===== Search & Chat ===== -->
-  <section id="view-search" hidden>
-    <h1>Search</h1>
-    <div class="search-input-row">
-      <input id="search-query" type="text"
-        placeholder='e.g. "plan activities like my videos around my location"'>
-      <button id="search-go" class="primary small">Search</button>
-    </div>
-    <p class="muted small">Search posts, find products, or type "plan a trip like my videos around my current location".</p>
+  <!-- ===== Pack the Plan ===== -->
+  <section id="view-plans" hidden>
+    <h1>Pack the Plan</h1>
+    <p id="plans-empty" class="muted" hidden>No saved plans yet. Search or select videos on the <strong>Home</strong> tab, then tap <strong>Save Plan</strong>.</p>
+    <div id="plans-list"></div>
+  </section>
 
-    <div id="search-post-select" hidden>
-      <p class="small" style="margin:12px 0 6px"><strong>Or select videos and tap:</strong></p>
-      <div id="search-post-grid" class="post-select-grid"></div>
-      <button id="plan-similar" class="primary" disabled>Plan similar travel / vacation</button>
+  <!-- ===== One plan ===== -->
+  <section id="view-plan" hidden>
+    <div id="plan-body"></div>
+    <div class="row">
+      <button id="share-plan-doc" class="primary">Share as travel document</button>
+      <button id="delete-plan" class="ghost">Delete</button>
     </div>
-
-    <div id="search-results"></div>
-    <div id="search-plan" hidden></div>
-    <p id="search-status" class="status"></p>
+    <p id="plan-status" class="status"></p>
   </section>
 
   <!-- ===== Settings ===== -->

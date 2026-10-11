@@ -10,14 +10,13 @@ import { buildIndex, search as localSearch, smartSearch, getPost as searchGetPos
 
 const MAX_FRAMES = 12;
 const FRAMES_PER_VIDEO = 6;
-const MAX_SIDE = 1280;     // px sent to the AI
-const GALLERY_SIDE = 2048; // px for saved photos
-const COVER_SIDE = 600;    // px for the post list thumbnail
+const MAX_SIDE = 1280;
+const GALLERY_SIDE = 2048;
+const COVER_SIDE = 600;
 const MAX_VIDEO_MB = 500;
 
 const VIDEO_TYPES = { mov: "video/quicktime", mp4: "video/mp4", m4v: "video/mp4", webm: "video/webm" };
 const BADGES = { seen: "In your post", suggested: "Pack for this trip", nearby: "Nearby" };
-// (heading, category, sources) in page order
 const POST_SECTIONS = [
   ["Shop the look", "product", ["seen"]],
   ["Pack for this trip", "product", ["suggested"]],
@@ -29,13 +28,13 @@ const POST_SECTIONS = [
 ];
 
 const $ = (id) => document.getElementById(id);
-let frames = [];   // [{dataUrl, b64}] - what the AI sees
-let picked = [];   // [{file, kind}] - what gets saved
-let gps = null;    // {lat, lon} rounded
+let frames = [];
+let picked = [];
+let gps = null;
 let analysis = null;
-let objectUrls = []; // revoked when leaving a post view
+let objectUrls = [];
 
-// ---------- settings (this phone only) ----------
+// ---------- settings ----------
 
 const SETTINGS_KEY = "fft-settings";
 function loadSettings() {
@@ -71,100 +70,7 @@ $("save-settings").addEventListener("click", () => {
   });
   if (!ok) return status("settings", "Couldn't save. Private browsing may be blocking storage.");
   status("settings", "Saved.");
-  if (key) location.hash = "#new";
-});
-
-// ---------- install prompt (Android + iPhone) ----------
-
-let deferredInstallPrompt = null;
-const isStandalone = window.matchMedia("(display-mode: standalone)").matches
-  || window.navigator.standalone === true;
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-const isAndroid = /Android/.test(navigator.userAgent);
-const isIOSSafari = isIOS && typeof navigator.standalone !== "undefined"
-  && !/CriOS|FxiOS|EdgiOS|FBAN|FBAV|Instagram|WhatsApp|GSA\//.test(navigator.userAgent);
-const isInAppBrowser = isIOS && !isIOSSafari;
-const bannerDismissed = () => { try { return localStorage.getItem("fft-install-dismissed"); } catch { return null; } };
-
-function showInstallGuide(html) {
-  const guide = $("install-guide");
-  $("install-guide-content").innerHTML = html;
-  guide.hidden = false;
-  $("install-guide-close").onclick = () => { guide.hidden = true; };
-}
-
-function showInstallBanner() {
-  if (isStandalone || bannerDismissed()) return;
-  const banner = $("install-banner");
-  if (!banner) return;
-
-  if (isIOS && isInAppBrowser) {
-    $("install-hint").textContent = "Open this page in Safari to install";
-    $("install-action").textContent = "Copy link";
-    $("install-action").addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(location.href);
-        showInstallGuide(
-          `<p class="ig-step"><strong>Link copied!</strong></p>
-           <p class="ig-step">1. Open <strong>Safari</strong> on your iPhone</p>
-           <p class="ig-step">2. Tap the address bar and <strong>paste</strong> the link</p>
-           <p class="ig-step">3. Tap the <strong>Share button</strong> <span class="ig-icon">⬆︎</span> at the bottom</p>
-           <p class="ig-step">4. Scroll down and tap <strong>“Add to Home Screen”</strong></p>
-           <p class="ig-step">5. Tap <strong>“Add”</strong></p>`
-        );
-      } catch {
-        showInstallGuide(
-          `<p class="ig-step">Copy this link and open it in <strong>Safari</strong>:</p>
-           <p class="ig-link">${location.href}</p>
-           <p class="ig-step">Then: <strong>Share</strong> <span class="ig-icon">⬆︎</span> → <strong>“Add to Home Screen”</strong> → <strong>“Add”</strong></p>`
-        );
-      }
-    });
-  } else if (isIOS) {
-    $("install-hint").textContent = 'Tap Share ⬆︎ then "Add to Home Screen"';
-    $("install-action").textContent = "Show me";
-    $("install-action").addEventListener("click", () => {
-      showInstallGuide(
-        `<p class="ig-step">1. Tap the <strong>Share button</strong> <span class="ig-icon">⬆︎</span> at the bottom of Safari</p>
-         <p class="ig-step">2. Scroll down the share sheet</p>
-         <p class="ig-step">3. Tap <strong>“Add to Home Screen”</strong></p>
-         <p class="ig-step">4. Tap <strong>“Add”</strong> in the top right</p>
-         <p class="ig-done">The app icon will appear on your Home Screen!</p>`
-      );
-    });
-  } else if (deferredInstallPrompt) {
-    $("install-action").addEventListener("click", async () => {
-      if (!deferredInstallPrompt) return;
-      deferredInstallPrompt.prompt();
-      await deferredInstallPrompt.userChoice;
-      deferredInstallPrompt = null;
-      banner.hidden = true;
-    });
-  } else if (isAndroid) {
-    $("install-hint").textContent = "Tap ⋮ menu then \"Add to Home screen\" or \"Install app\"";
-    $("install-action").textContent = "Got it";
-    $("install-action").addEventListener("click", () => { banner.hidden = true; });
-  } else {
-    return;
-  }
-  $("install-dismiss").addEventListener("click", () => {
-    banner.hidden = true;
-    $("install-guide").hidden = true;
-    try { localStorage.setItem("fft-install-dismissed", "1"); } catch {}
-  });
-  banner.hidden = false;
-}
-
-window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault();
-  deferredInstallPrompt = e;
-  showInstallBanner();
-});
-
-window.addEventListener("appinstalled", () => {
-  deferredInstallPrompt = null;
-  const banner = $("install-banner");
-  if (banner) banner.hidden = true;
+  if (key) location.hash = "#home";
 });
 
 // ---------- audio extraction ----------
@@ -212,23 +118,169 @@ function encodeWav(samples, sampleRate) {
 
 // ---------- routing ----------
 
+const ALL_VIEWS = ["home", "new", "posts", "post", "search", "plans", "plan", "settings"];
+
 function route() {
   for (const url of objectUrls) URL.revokeObjectURL(url);
   objectUrls = [];
   removeFabShare();
-  let [view, id] = (location.hash.slice(1) || "new").split("/");
+  let [view, id] = (location.hash.slice(1) || "home").split("/");
   if (!apiKey() && view !== "settings") view = "settings";
-  for (const v of ["new", "posts", "post", "search", "settings"]) $(`view-${v}`).hidden = v !== view;
+  for (const v of ALL_VIEWS) {
+    const el = $(`view-${v}`);
+    if (el) el.hidden = v !== view;
+  }
   for (const a of document.querySelectorAll(".tabs a")) {
-    a.classList.toggle("active", a.dataset.tab === (view === "post" ? "posts" : view));
+    const tab = a.dataset.tab;
+    a.classList.toggle("active", tab === view || (view === "post" && tab === "posts") || (view === "plan" && tab === "plans"));
   }
   if (view === "settings") fillSettingsForm();
+  if (view === "home") initHome();
   if (view === "posts") renderPostList();
   if (view === "post") renderPost(id);
-  if (view === "search") initSearch();
+  if (view === "plans") renderPlansList();
+  if (view === "plan") renderSavedPlan(id);
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", route);
+
+// Fix iOS blank screen after sharing — re-render the current view
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    const [view] = (location.hash.slice(1) || "home").split("/");
+    if (view === "post" && currentPost) updatePostShareBar();
+    else if (view === "home" || view === "posts" || view === "plans") route();
+  }
+});
+window.addEventListener("pageshow", (e) => {
+  if (e.persisted) route();
+});
+
+// ---------- Home tab (landing) ----------
+
+let homeSelectedPosts = new Set();
+
+async function initHome() {
+  await buildIndex();
+  renderHomeFeed();
+  renderHomePostGrid();
+}
+
+async function renderHomeFeed() {
+  const posts = await db.listPosts();
+  const feed = $("home-feed");
+  feed.innerHTML = "";
+  $("home-empty").hidden = posts.length > 0;
+  $("home-feed-heading").hidden = !posts.length;
+
+  for (const p of posts) {
+    const card = el("div", { class: "feed-card" });
+    if (p.cover) card.append(el("img", { src: p.cover, alt: "", class: "feed-thumb" }));
+    const info = el("div", { class: "feed-info" });
+    info.append(el("p", { class: "feed-title" }, p.caption || "Untitled post"));
+    const metaParts = [];
+    if (p.place) metaParts.push(`📍 ${p.place}`);
+    metaParts.push(new Date(p.created).toLocaleDateString());
+    info.append(el("p", { class: "feed-meta" }, metaParts.join(" · ")));
+    if (p.items?.length) {
+      const itemNames = p.items.slice(0, 4).map((i) => i.name).join(", ");
+      info.append(el("p", { class: "feed-items" }, itemNames + (p.items.length > 4 ? ` +${p.items.length - 4} more` : "")));
+    }
+    card.append(info);
+    card.addEventListener("click", () => { location.hash = `#post/${p.id}`; });
+    feed.append(card);
+  }
+}
+
+function renderHomePostGrid() {
+  const grid = $("home-post-grid");
+  if (!grid) return;
+  grid.innerHTML = "";
+  homeSelectedPosts.clear();
+  const posts = getAllPosts();
+  if (!posts.length) { $("home-post-select").hidden = true; return; }
+  $("home-post-select").hidden = false;
+  for (const p of posts.slice(0, 12)) {
+    const card = el("div", { class: "select-card" });
+    if (p.cover) card.append(el("img", { src: p.cover, alt: "" }));
+    const label = el("div", { class: "select-label" });
+    label.textContent = p.caption?.slice(0, 40) || "Untitled";
+    card.append(label);
+    card.addEventListener("click", () => {
+      if (homeSelectedPosts.has(p.id)) { homeSelectedPosts.delete(p.id); card.classList.remove("selected"); }
+      else { homeSelectedPosts.add(p.id); card.classList.add("selected"); }
+      $("home-plan-similar").disabled = homeSelectedPosts.size === 0;
+    });
+    grid.append(card);
+  }
+}
+
+async function homeSearch() {
+  const query = $("home-search-query").value.trim();
+  if (!query) return;
+  $("home-search-go").disabled = true;
+  $("home-search-results").innerHTML = "";
+  $("home-search-plan").hidden = true;
+  removeFabShare();
+
+  let userLocation = null;
+  if (queryNeedsLocation(query)) {
+    status("home", "Getting your location…");
+    userLocation = await getUserLocation();
+    if (!userLocation) {
+      status("home", "Couldn't get your location. Please enable location access and try again.");
+      $("home-search-go").disabled = false;
+      return;
+    }
+    status("home", "Searching around your location…");
+  } else {
+    status("home", "Searching…");
+  }
+
+  try {
+    const result = await smartSearch(apiKey(), query, null, userLocation);
+    renderSearchResult(result, "home");
+    status("home", "");
+  } catch (err) {
+    status("home", err.message);
+  } finally {
+    $("home-search-go").disabled = false;
+  }
+}
+
+$("home-search-go").addEventListener("click", homeSearch);
+$("home-search-query").addEventListener("keydown", (e) => { if (e.key === "Enter") homeSearch(); });
+
+$("home-plan-similar").addEventListener("click", async () => {
+  if (!homeSelectedPosts.size) return;
+  $("home-plan-similar").disabled = true;
+  removeFabShare();
+  const query = $("home-search-query").value.trim() || "plan a vacation with all details similar to shown";
+
+  let userLocation = null;
+  if (queryNeedsLocation(query)) {
+    status("home", "Getting your location…");
+    userLocation = await getUserLocation();
+    if (!userLocation) {
+      status("home", "Couldn't get your location. Please enable location access and try again.");
+      $("home-plan-similar").disabled = false;
+      return;
+    }
+    status("home", "Planning around your location…");
+  } else {
+    status("home", "Planning your trip based on selected videos…");
+  }
+
+  try {
+    const result = await smartSearch(apiKey(), query, [...homeSelectedPosts], userLocation);
+    renderSearchResult(result, "home");
+    status("home", "");
+  } catch (err) {
+    status("home", err.message);
+  } finally {
+    $("home-plan-similar").disabled = false;
+  }
+});
 
 // ---------- Step 1: pick & sample ----------
 
@@ -304,7 +356,7 @@ async function drawImage(blob, maxSide) {
   try {
     const img = new Image();
     img.src = url;
-    await img.decode(); // iPhone Safari converts HEIC for us
+    await img.decode();
     return fitCanvas(img, img.naturalWidth, img.naturalHeight, maxSide);
   } finally {
     URL.revokeObjectURL(url);
@@ -332,7 +384,6 @@ async function sampleVideo(file, n) {
     await loaded;
     const out = [];
     for (let k = 0; k < n; k++) {
-      // Evenly spaced, avoiding the very first/last frame (often black).
       const seeked = waitFor(v, "seeked");
       v.currentTime = (v.duration * (k + 0.5)) / n;
       await seeked;
@@ -349,10 +400,9 @@ async function readGps(file) {
   try {
     const g = await exifr.gps(file);
     if (!g || g.latitude == null) return null;
-    // Round to 2 decimals (~1 km) so we never keep an exact home address.
     return { lat: +g.latitude.toFixed(2), lon: +g.longitude.toFixed(2) };
   } catch {
-    return null; // many shared photos have location stripped - that's fine
+    return null;
   }
 }
 
@@ -385,7 +435,6 @@ function showReview() {
   $("summary").textContent = analysis.summary;
   $("place").value = place;
   $("place-evidence").textContent = loc.evidence ? `How we know (${loc.confidence} confidence): ${loc.evidence}` : "";
-  // Hide location by default when it might be someone's home or is a guess.
   $("show-place").checked = !!place && !loc.looks_like_private_home && loc.confidence !== "unknown";
   if (loc.looks_like_private_home) {
     $("place-evidence").textContent += " · Looks like a private home, so it's hidden by default.";
@@ -479,7 +528,6 @@ $("publish").addEventListener("click", async () => {
     const media = [];
     for (const p of picked) {
       if (p.kind === "image") {
-        // Re-drawing the photo also strips its metadata (including exact GPS).
         const canvas = await drawImage(p.file, GALLERY_SIDE);
         const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.85));
         media.push({ kind: "image", type: "image/jpeg", name: "photo.jpg", blob });
@@ -505,21 +553,18 @@ $("publish").addEventListener("click", async () => {
     }
     const allFrameDataUrls = frames.map((f) => f.dataUrl);
     await db.savePost({
-      id,
-      created: Date.now(),
+      id, created: Date.now(),
       caption: $("caption").value.trim(),
       place: $("show-place").checked ? $("place").value.trim() : "",
       sourceUrl: sourceUrl || "",
       location: analysis?.location || null,
       tags: $("tags").value.trim(),
-      items: collectedItems,
-      itemFrames,
+      items: collectedItems, itemFrames,
       allFrames: allFrameDataUrls.slice(0, 6),
       news: [...$("local").children]
         .filter((li) => li.querySelector(".keep").checked)
         .map((li) => JSON.parse(li.dataset.json)),
-      media,
-      cover,
+      media, cover,
     });
     db.requestPersistence();
     resetNew();
@@ -610,8 +655,9 @@ async function renderPost(id) {
 
   body.append(el("h1", {}, p.caption));
   if (p.sourceUrl) {
-    const srcLink = el("a", { href: p.sourceUrl, target: "_blank", rel: "noopener", class: "source-link" }, `🔗 ${p.sourceUrl}`);
-    body.append(el("p", { class: "source" }, srcLink));
+    const srcP = el("p", { class: "source" });
+    srcP.append(el("a", { href: p.sourceUrl, target: "_blank", rel: "noopener", class: "source-link" }, `🔗 ${p.sourceUrl}`));
+    body.append(srcP);
   }
   if (p.place) {
     body.append(el("p", { class: "place" }, `📍 ${p.place}`));
@@ -723,8 +769,6 @@ $("delete-post").addEventListener("click", async () => {
   location.hash = "#posts";
 });
 
-// ---------- social share bar in post view ----------
-
 function updatePostShareBar() {
   const bar = $("post-share-bar");
   if (!bar || !currentPost) return;
@@ -784,7 +828,6 @@ $("import-link").addEventListener("click", async () => {
         return;
       }
     }
-    // For any other link: create a placeholder frame so Analyze works
     addFrame(makeLinkPlaceholder(url, host));
     $("analyze").disabled = false;
     $("tags").value = ($("tags").value ? $("tags").value + " " : "") + url;
@@ -794,7 +837,7 @@ $("import-link").addEventListener("click", async () => {
   }
 });
 
-// ---------- geolocation for "around my location" ----------
+// ---------- geolocation ----------
 
 const LOCATION_KEYWORDS = /\b(my location|near me|around me|current location|my area|nearby|close to me|where i am)\b/i;
 
@@ -813,7 +856,7 @@ function getUserLocation() {
   });
 }
 
-// ---------- floating share button for plans ----------
+// ---------- floating share button ----------
 
 let fabShareBtn = null;
 
@@ -827,10 +870,14 @@ function showFabShare(planText) {
         await navigator.share({ title: "Pack your Plan", text: planText });
       } else {
         await navigator.clipboard.writeText(planText);
-        status("search", "Plan copied to clipboard!");
+        const active = location.hash.startsWith("#home") ? "home" : "search";
+        status(active, "Plan copied to clipboard!");
       }
     } catch (err) {
-      if (err.name !== "AbortError") status("search", `Couldn't share: ${err.message}`);
+      if (err.name !== "AbortError") {
+        const active = location.hash.startsWith("#home") ? "home" : "search";
+        status(active, `Couldn't share: ${err.message}`);
+      }
     }
   });
   document.body.append(fabShareBtn);
@@ -840,105 +887,16 @@ function removeFabShare() {
   if (fabShareBtn) { fabShareBtn.remove(); fabShareBtn = null; }
 }
 
-// ---------- search ----------
+// ---------- search results (shared by Home and Search views) ----------
 
-let selectedSearchPosts = new Set();
+let lastPlanData = null;
+let lastPlanPosts = null;
 
-async function initSearch() {
-  await buildIndex();
-  renderPostSelectGrid();
-}
-
-function renderPostSelectGrid() {
-  const grid = $("search-post-grid");
-  if (!grid) return;
-  grid.innerHTML = "";
-  const posts = getAllPosts();
-  if (!posts.length) { $("search-post-select").hidden = true; return; }
-  $("search-post-select").hidden = false;
-  for (const p of posts.slice(0, 12)) {
-    const card = el("div", { class: "select-card" });
-    if (p.cover) card.append(el("img", { src: p.cover, alt: "" }));
-    const label = el("div", { class: "select-label" });
-    label.textContent = p.caption?.slice(0, 40) || "Untitled";
-    card.append(label);
-    card.addEventListener("click", () => {
-      if (selectedSearchPosts.has(p.id)) { selectedSearchPosts.delete(p.id); card.classList.remove("selected"); }
-      else { selectedSearchPosts.add(p.id); card.classList.add("selected"); }
-      $("plan-similar").disabled = selectedSearchPosts.size === 0;
-    });
-    grid.append(card);
-  }
-}
-
-$("plan-similar").addEventListener("click", async () => {
-  if (!selectedSearchPosts.size) return;
-  $("plan-similar").disabled = true;
-  removeFabShare();
-  const query = $("search-query").value.trim() || "plan a vacation with all details similar to shown";
-
-  let userLocation = null;
-  if (queryNeedsLocation(query)) {
-    status("search", "Getting your location…");
-    userLocation = await getUserLocation();
-    if (!userLocation) {
-      status("search", "Couldn't get your location. Please enable location access and try again.");
-      $("plan-similar").disabled = false;
-      return;
-    }
-    status("search", "Planning around your location…");
-  } else {
-    status("search", "Planning your trip based on selected videos…");
-  }
-
-  try {
-    const result = await smartSearch(apiKey(), query, [...selectedSearchPosts], userLocation);
-    renderSearchResult(result);
-    status("search", "");
-  } catch (err) {
-    status("search", err.message);
-  } finally {
-    $("plan-similar").disabled = false;
-  }
-});
-
-$("search-go").addEventListener("click", async () => {
-  const query = $("search-query").value.trim();
-  if (!query) return;
-  $("search-go").disabled = true;
-  $("search-results").innerHTML = "";
-  $("search-plan").hidden = true;
-  removeFabShare();
-
-  let userLocation = null;
-  if (queryNeedsLocation(query)) {
-    status("search", "Getting your location…");
-    userLocation = await getUserLocation();
-    if (!userLocation) {
-      status("search", "Couldn't get your location. Please enable location access and try again.");
-      $("search-go").disabled = false;
-      return;
-    }
-    status("search", "Searching around your location…");
-  } else {
-    status("search", "Searching…");
-  }
-
-  try {
-    const result = await smartSearch(apiKey(), query, null, userLocation);
-    renderSearchResult(result);
-    status("search", "");
-  } catch (err) {
-    status("search", err.message);
-  } finally {
-    $("search-go").disabled = false;
-  }
-});
-
-function renderSearchResult(result) {
-  const container = $("search-results");
+function renderSearchResult(result, ctx = "home") {
+  const container = $(ctx === "home" ? "home-search-results" : "search-results");
+  const planContainer = $(ctx === "home" ? "home-search-plan" : "search-plan");
   container.innerHTML = "";
-  $("search-plan").hidden = true;
+  planContainer.hidden = true;
 
   if (result.type === "results") {
     const L = links();
@@ -970,14 +928,13 @@ function renderSearchResult(result) {
       const meta = el("div", { class: "sr-meta" });
       meta.append(el("strong", {}, post.caption || "Untitled"));
       if (post.place) meta.append(el("p", { class: "small muted" }, `📍 ${post.place}`));
-      const viewBtn = el("a", { href: `#post/${post.id}`, class: "btn small" }, "View full post");
-      meta.append(viewBtn);
+      meta.append(el("a", { href: `#post/${post.id}`, class: "btn small" }, "View full post"));
       row.append(left, right);
       container.append(row, meta);
     }
-    if (!result.posts.length) status("search", "No matching posts found. Try a different search.");
+    if (!result.posts.length) status(ctx, "No matching posts found. Try a different search.");
   } else if (result.type === "plan") {
-    renderPlan(result.plan, result.posts);
+    renderPlan(result.plan, result.posts, ctx);
   } else if (result.type === "products") {
     for (const item of result.items || []) {
       const card = el("div", { class: "product-card" });
@@ -995,16 +952,17 @@ function renderSearchResult(result) {
   }
 }
 
-function renderPlan(plan, posts) {
-  const container = $("search-plan");
+function renderPlan(plan, posts, ctx = "home") {
+  const container = $(ctx === "home" ? "home-search-plan" : "search-plan");
   container.innerHTML = "";
   container.hidden = false;
+  lastPlanData = plan;
+  lastPlanPosts = posts;
 
   container.append(el("h2", { class: "plan-title" }, "🎒 Pack your Plan"));
   if (plan.destination) container.append(el("h3", {}, plan.destination));
   if (plan.overview) container.append(el("p", { class: "plan-overview" }, plan.overview));
 
-  const L = links();
   const shareLines = ["🎒 Pack your Plan"];
   if (plan.destination) shareLines.push(plan.destination);
   if (plan.overview) shareLines.push("", plan.overview);
@@ -1034,17 +992,147 @@ function renderPlan(plan, posts) {
     shareLines.push("", `💰 Estimated budget: ${plan.budget}`);
   }
   shareLines.push("", "Created with Fun, Food & Travel");
+
+  const actions = el("div", { class: "plan-actions" });
+  const saveBtn = el("button", { class: "primary" }, "Save Plan");
+  saveBtn.addEventListener("click", () => savePlanToDb(plan, posts, ctx));
+  actions.append(saveBtn);
+  container.append(actions);
+
   showFabShare(shareLines.join("\n"));
 }
 
-$("search-query").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") $("search-go").click();
-});
+async function savePlanToDb(plan, posts, ctx) {
+  const id = crypto.randomUUID();
+  const coverImages = (posts || []).filter((p) => p.cover).map((p) => p.cover).slice(0, 4);
+  await db.savePlan({
+    id, created: Date.now(),
+    destination: plan.destination || "Travel Plan",
+    overview: plan.overview || "",
+    sections: plan.sections || [],
+    budget: plan.budget || "",
+    coverImages,
+    postIds: (posts || []).map((p) => p.id),
+  });
+  db.requestPersistence();
+  status(ctx, "Plan saved! Find it in the Plans tab.");
+}
+
+// ---------- Pack the Plan tab ----------
+
+async function renderPlansList() {
+  const plans = await db.listPlans();
+  $("plans-empty").hidden = plans.length > 0;
+  const list = $("plans-list");
+  list.innerHTML = "";
+  for (const p of plans) {
+    const card = el("div", { class: "plan-card" });
+    card.append(el("p", { class: "plan-card-title" }, `🎒 ${p.destination}`));
+    if (p.overview) {
+      const short = p.overview.length > 120 ? p.overview.slice(0, 117) + "…" : p.overview;
+      card.append(el("p", { class: "plan-card-overview" }, short));
+    }
+    card.append(el("p", { class: "plan-card-date" }, new Date(p.created).toLocaleDateString()));
+    card.addEventListener("click", () => { location.hash = `#plan/${p.id}`; });
+    list.append(card);
+  }
+}
+
+async function renderSavedPlan(id) {
+  const body = $("plan-body");
+  body.innerHTML = "";
+  status("plan", "");
+  const plan = await db.getPlan(id);
+  if (!plan) {
+    body.append(el("p", { class: "muted" }, "Plan not found."));
+    return;
+  }
+
+  body.append(el("h2", { class: "plan-title" }, `🎒 ${plan.destination}`));
+  if (plan.overview) body.append(el("p", { class: "plan-overview" }, plan.overview));
+
+  if (plan.coverImages?.length) {
+    const thumbRow = el("div", { class: "thumbs" });
+    for (const src of plan.coverImages) thumbRow.append(el("img", { src, alt: "" }));
+    body.append(thumbRow);
+  }
+
+  for (const section of plan.sections || []) {
+    body.append(el("h3", { class: "plan-section-title" }, section.title));
+    const list = el("ul", { class: "plan-items" });
+    for (const item of section.items || []) {
+      const li = el("li", { class: "plan-item" });
+      const top = el("div", { class: "plan-item-top" });
+      top.append(el("strong", {}, item.name));
+      if (item.price) top.append(el("span", { class: "plan-price" }, ` ${item.price}`));
+      li.append(top);
+      if (item.description) li.append(el("p", { class: "small muted" }, item.description));
+      if (item.link) li.append(el("a", { href: item.link, target: "_blank", rel: "noopener", class: "btn small" }, "Book / Buy"));
+      list.append(li);
+    }
+    body.append(list);
+  }
+  if (plan.budget) {
+    body.append(el("div", { class: "plan-budget" }, `💰 Estimated budget: ${plan.budget}`));
+  }
+
+  // Wire share and delete for this plan
+  lastPlanData = plan;
+  $("share-plan-doc").onclick = () => sharePlanAsDocument(plan);
+  $("delete-plan").onclick = async () => {
+    if (!confirm("Delete this plan?")) return;
+    await db.deletePlan(plan.id);
+    location.hash = "#plans";
+  };
+}
+
+function sharePlanAsDocument(plan) {
+  const html = buildPlanHTML(plan);
+  const blob = new Blob([html], { type: "text/html" });
+  const file = new File([blob], `${plan.destination || "Travel-Plan"}.html`, { type: "text/html" });
+  if (navigator.canShare?.({ files: [file] })) {
+    navigator.share({ files: [file], title: plan.destination });
+  } else {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = file.name; a.click();
+    URL.revokeObjectURL(url);
+    status("plan", "Travel plan downloaded as HTML document.");
+  }
+}
+
+function buildPlanHTML(plan) {
+  let sections = "";
+  for (const s of plan.sections || []) {
+    let items = "";
+    for (const it of s.items || []) {
+      const priceHtml = it.price ? `<span style="color:#e84393;font-weight:700;margin-left:8px">${it.price}</span>` : "";
+      const linkHtml = it.link ? `<a href="${it.link}" style="display:inline-block;margin-top:6px;padding:6px 14px;border-radius:8px;background:linear-gradient(135deg,#e8590c,#e84393);color:#fff;text-decoration:none;font-size:0.85rem;font-weight:700">Book / Buy</a>` : "";
+      const descHtml = it.description ? `<p style="color:#6b7280;font-size:0.88rem;margin:4px 0 0">${it.description}</p>` : "";
+      items += `<li style="background:#f8f8fc;border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin:6px 0"><strong>${it.name}</strong>${priceHtml}${descHtml}${linkHtml}</li>`;
+    }
+    sections += `<h3 style="margin:20px 0 8px;font-size:1.1rem">${s.title}</h3><ul style="list-style:none;padding:0">${items}</ul>`;
+  }
+  const budgetHtml = plan.budget ? `<div style="margin:20px 0;padding:14px;border-radius:12px;background:#f0f0f5;font-weight:700;font-size:1rem;text-align:center">💰 Estimated budget: ${plan.budget}</div>` : "";
+  const coverHtml = (plan.coverImages || []).map((src) => `<img src="${src}" style="width:120px;height:90px;object-fit:cover;border-radius:8px">`).join("");
+  const coverRow = coverHtml ? `<div style="display:flex;gap:6px;margin:12px 0;flex-wrap:wrap">${coverHtml}</div>` : "";
+
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>🎒 ${plan.destination}</title></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:16px;color:#1a1a2e;background:#fff">
+<h1 style="background:linear-gradient(135deg,#e8590c,#e84393);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:1.6rem">🎒 Pack your Plan</h1>
+<h2 style="margin:8px 0">${plan.destination}</h2>
+${coverRow}
+<p style="color:#6b7280;line-height:1.5">${plan.overview || ""}</p>
+${sections}${budgetHtml}
+<p style="margin-top:24px;font-size:0.75rem;color:#9ca3af">Created with Fun, Food & Travel</p>
+</body></html>`;
+}
 
 // ---------- helpers ----------
 
 function status(step, msg) {
-  $(`${step}-status`).textContent = msg;
+  const el = $(`${step}-status`);
+  if (el) el.textContent = msg;
 }
 
 if ("serviceWorker" in navigator) {
