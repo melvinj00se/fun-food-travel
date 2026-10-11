@@ -1077,9 +1077,39 @@ async function renderSavedPlan(id) {
     body.append(el("div", { class: "plan-budget" }, `💰 Estimated budget: ${plan.budget}`));
   }
 
-  // Wire share and delete for this plan
+  // Build shareable text for this plan
+  const text = planShareText(plan);
   lastPlanData = plan;
-  $("share-plan-doc").onclick = () => sharePlanAsDocument(plan);
+
+  // Social share bar
+  const bar = $("plan-share-bar");
+  if (bar) { bar.innerHTML = ""; bar.append(renderShareBar(text, null, null)); }
+
+  // Share as text (works on all social media)
+  $("share-plan-doc").onclick = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `🎒 ${plan.destination}`, text });
+      } else {
+        await navigator.clipboard.writeText(text);
+        status("plan", "Plan copied to clipboard! Paste it anywhere.");
+      }
+    } catch (err) {
+      if (err.name !== "AbortError") status("plan", `Couldn't share: ${err.message}`);
+    }
+  };
+
+  // Download as styled HTML document
+  $("download-plan-doc").onclick = () => {
+    const html = buildPlanHTML(plan);
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${plan.destination || "Travel-Plan"}.html`; a.click();
+    URL.revokeObjectURL(url);
+    status("plan", "Travel plan downloaded.");
+  };
+
   $("delete-plan").onclick = async () => {
     if (!confirm("Delete this plan?")) return;
     await db.deletePlan(plan.id);
@@ -1087,19 +1117,22 @@ async function renderSavedPlan(id) {
   };
 }
 
-function sharePlanAsDocument(plan) {
-  const html = buildPlanHTML(plan);
-  const blob = new Blob([html], { type: "text/html" });
-  const file = new File([blob], `${plan.destination || "Travel-Plan"}.html`, { type: "text/html" });
-  if (navigator.canShare?.({ files: [file] })) {
-    navigator.share({ files: [file], title: plan.destination });
-  } else {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = file.name; a.click();
-    URL.revokeObjectURL(url);
-    status("plan", "Travel plan downloaded as HTML document.");
+function planShareText(plan) {
+  const lines = [`🎒 Pack your Plan: ${plan.destination}`];
+  if (plan.overview) lines.push("", plan.overview);
+  for (const s of plan.sections || []) {
+    lines.push("", `--- ${s.title} ---`);
+    for (const it of s.items || []) {
+      let line = `• ${it.name}`;
+      if (it.price) line += ` — ${it.price}`;
+      if (it.description) line += `\n  ${it.description}`;
+      if (it.link) line += `\n  ${it.link}`;
+      lines.push(line);
+    }
   }
+  if (plan.budget) lines.push("", `💰 ${plan.budget}`);
+  lines.push("", "Created with Fun, Food & Travel");
+  return lines.join("\n");
 }
 
 function buildPlanHTML(plan) {
