@@ -204,6 +204,18 @@
     <p class="muted small">Your key is saved only on this phone and is sent only to Anthropic.
       Don't use this app on a phone you share with others.</p>
 
+    <h2>Cloud sharing <small class="muted">(share posts across all devices &amp; users)</small></h2>
+    <p class="muted small">Connect a free Supabase project so all posts appear on every device.
+      Without this, posts are stored only on this device.</p>
+    <label class="field">Supabase project URL
+      <input id="supabase-url" type="url" autocomplete="off" autocapitalize="off"
+             placeholder="https://abcdefg.supabase.co">
+    </label>
+    <label class="field">Supabase anon key
+      <input id="supabase-key" type="password" autocomplete="off" autocapitalize="off"
+             placeholder="eyJhbG…">
+    </label>
+
     <h2>Affiliate IDs <small class="muted">(optional)</small></h2>
     <label class="field">Amazon Associates tag <input id="id-amazon" type="text" autocapitalize="off"></label>
     <label class="field">eBay Partner Network campaign ID <input id="id-ebay" type="text" autocapitalize="off"></label>

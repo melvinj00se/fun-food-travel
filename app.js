@@ -7,6 +7,7 @@ import { makeLinks } from "./links.js";
 import * as db from "./db.js";
 import { renderShareBar } from "./social.js";
 import { buildIndex, search as localSearch, smartSearch, getPost as searchGetPost, getAllPosts } from "./search.js";
+import * as cloud from "./cloud.js";
 
 const MAX_FRAMES = 12;
 const FRAMES_PER_VIDEO = 6;
@@ -49,6 +50,8 @@ const links = () => makeLinks(loadSettings().ids || {});
 function fillSettingsForm() {
   const s = loadSettings();
   $("api-key").value = s.apiKey || "";
+  $("supabase-url").value = s.supabaseUrl || "";
+  $("supabase-key").value = s.supabaseKey || "";
   $("id-amazon").value = s.ids?.amazon || "";
   $("id-ebay").value = s.ids?.ebay || "";
   $("id-booking").value = s.ids?.booking || "";
@@ -56,20 +59,32 @@ function fillSettingsForm() {
   $("welcome").hidden = !!s.apiKey;
 }
 
-$("save-settings").addEventListener("click", () => {
+$("save-settings").addEventListener("click", async () => {
   const key = $("api-key").value.trim();
   if (key && key !== DEMO_KEY && !key.startsWith("sk-ant-")) {
     return status("settings", "That doesn't look like an Anthropic key (they start with sk-ant-).");
   }
   const ok = saveSettings({
     apiKey: key,
+    supabaseUrl: $("supabase-url").value.trim(),
+    supabaseKey: $("supabase-key").value.trim(),
     ids: {
       amazon: $("id-amazon").value.trim(), ebay: $("id-ebay").value.trim(),
       booking: $("id-booking").value.trim(), gyg: $("id-gyg").value.trim(),
     },
   });
   if (!ok) return status("settings", "Couldn't save. Private browsing may be blocking storage.");
-  status("settings", "Saved.");
+  if (cloud.isConfigured()) {
+    status("settings", "Saved. Testing cloud connection…");
+    try {
+      await cloud.fetchPosts(1);
+      status("settings", "Saved. Cloud connected!");
+    } catch (err) {
+      status("settings", `Saved, but cloud failed: ${err.message}`);
+    }
+  } else {
+    status("settings", "Saved. (Cloud sharing not configured — posts stay on this device only.)");
+  }
   if (key) location.hash = "#home";
 });
 
@@ -167,7 +182,29 @@ async function initHome() {
 }
 
 async function renderHomeFeed() {
-  const posts = await db.listPosts();
+  const localPosts = await db.listPosts();
+  let posts;
+
+  if (cloud.isConfigured()) {
+    status("home", "Loading posts from all users…");
+    try {
+      const cloudPosts = await cloud.fetchPosts(200);
+      const localIds = new Set(localPosts.map((p) => p.id));
+      const merged = [...localPosts];
+      for (const cp of cloudPosts) {
+        if (!localIds.has(cp.id)) merged.push(cp);
+      }
+      merged.sort((a, b) => b.created - a.created);
+      posts = merged;
+      status("home", "");
+    } catch {
+      posts = localPosts;
+      status("home", "Couldn't reach cloud — showing local posts only.");
+    }
+  } else {
+    posts = localPosts;
+  }
+
   const feed = $("home-feed");
   feed.innerHTML = "";
   $("home-empty").hidden = posts.length > 0;
@@ -553,7 +590,7 @@ $("publish").addEventListener("click", async () => {
       else if (frames[0]) itemFrames[item.name] = frames[0].dataUrl;
     }
     const allFrameDataUrls = frames.map((f) => f.dataUrl);
-    await db.savePost({
+    const post = {
       id, created: Date.now(),
       caption: $("caption").value.trim(),
       place: $("show-place").checked ? $("place").value.trim() : "",
@@ -566,8 +603,10 @@ $("publish").addEventListener("click", async () => {
         .filter((li) => li.querySelector(".keep").checked)
         .map((li) => JSON.parse(li.dataset.json)),
       media, cover,
-    });
+    };
+    await db.savePost(post);
     db.requestPersistence();
+    cloud.uploadPost(post);
     resetNew();
     location.hash = `#post/${id}`;
   } catch (err) {
@@ -634,25 +673,33 @@ async function renderPost(id) {
   body.innerHTML = "";
   status("post", "");
   currentPost = await db.getPost(id);
+  if (!currentPost && cloud.isConfigured()) {
+    currentPost = await cloud.fetchPost(id);
+  }
   if (!currentPost) {
-    body.append(el("p", { class: "muted" }, "This post isn't on this phone."));
+    body.append(el("p", { class: "muted" }, "This post isn't available."));
     return;
   }
   const p = currentPost;
+  const isCloudOnly = !!p._cloud;
   const L = links();
 
-  const gallery = el("div", { class: "gallery" });
-  for (const m of p.media) {
-    const url = URL.createObjectURL(m.blob);
-    objectUrls.push(url);
-    if (m.kind === "video") {
-      gallery.append(el("video", { src: url, controls: "", playsinline: "", preload: "metadata" }));
-    } else {
-      gallery.append(el("img", { src: url, alt: "" }));
+  if (!isCloudOnly && p.media?.length) {
+    const gallery = el("div", { class: "gallery" });
+    for (const m of p.media) {
+      const url = URL.createObjectURL(m.blob);
+      objectUrls.push(url);
+      if (m.kind === "video") {
+        gallery.append(el("video", { src: url, controls: "", playsinline: "", preload: "metadata" }));
+      } else {
+        gallery.append(el("img", { src: url, alt: "" }));
+      }
     }
+    body.append(gallery);
+    if (p.media.length > 1) body.append(el("p", { class: "gallery-count" }, `${p.media.length} photos & videos — swipe`));
+  } else if (p.cover) {
+    body.append(el("img", { src: p.cover, alt: p.caption || "", class: "sr-cover", style: "width:100%;border-radius:12px;margin-bottom:12px" }));
   }
-  body.append(gallery);
-  if (p.media.length > 1) body.append(el("p", { class: "gallery-count" }, `${p.media.length} photos & videos — swipe`));
 
   body.append(el("h1", {}, p.caption));
   if (p.sourceUrl) {
@@ -1006,7 +1053,7 @@ function renderPlan(plan, posts, ctx = "home") {
 async function savePlanToDb(plan, posts, ctx) {
   const id = crypto.randomUUID();
   const coverImages = (posts || []).filter((p) => p.cover).map((p) => p.cover).slice(0, 4);
-  await db.savePlan({
+  const planObj = {
     id, created: Date.now(),
     destination: plan.destination || "Travel Plan",
     overview: plan.overview || "",
@@ -1014,8 +1061,10 @@ async function savePlanToDb(plan, posts, ctx) {
     budget: plan.budget || "",
     coverImages,
     postIds: (posts || []).map((p) => p.id),
-  });
+  };
+  await db.savePlan(planObj);
   db.requestPersistence();
+  cloud.uploadPlan(planObj);
   status(ctx, "Plan saved! Find it in the Plans tab.");
 }
 
