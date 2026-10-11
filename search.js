@@ -178,3 +178,59 @@ function demoSearch(query) {
     query,
   };
 }
+
+export async function fetchPlanImages(apiKey, plan) {
+  if (apiKey === DEMO_KEY) return {};
+
+  const items = [];
+  if (plan.destination) items.push({ key: "destination", term: plan.destination });
+  for (let si = 0; si < (plan.sections || []).length; si++) {
+    for (let ii = 0; ii < (plan.sections[si].items || []).length; ii++) {
+      const item = plan.sections[si].items[ii];
+      items.push({ key: `${si}-${ii}`, term: `${item.name} ${plan.destination || ""}`.trim() });
+    }
+  }
+  const searchItems = items.slice(0, 16);
+
+  const prompt = `I need real photos for a travel plan document. For each item below, search the web and find ONE direct image URL — a real photo of that specific place, hotel, food, activity, or product.
+
+${searchItems.map((s, i) => `${i + 1}. ${s.term}`).join("\n")}
+
+Reply ONLY with JSON — an array in the same order:
+[{"index": 1, "image": "https://example.com/photo.jpg"}, ...]
+
+Rules:
+- Use direct image URLs (ending in .jpg, .jpeg, .png, .webp, or from image CDNs)
+- Prefer images from Wikipedia/Wikimedia Commons, official tourism sites, or booking sites
+- If you can't find an image for an item, set "image" to ""
+- Return exactly ${searchItems.length} entries`;
+
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  let response = await client.beta.messages.create({
+    model: MODEL, max_tokens: 4000,
+    betas: [FALLBACK_BETA], fallbacks: "default",
+    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 10 }],
+    messages: [{ role: "user", content: prompt }],
+  });
+  for (let i = 0; i < 3 && response.stop_reason === "pause_turn"; i++) {
+    response = await client.beta.messages.create({
+      model: MODEL, max_tokens: 4000,
+      betas: [FALLBACK_BETA], fallbacks: "default",
+      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 10 }],
+      messages: [{ role: "user", content: prompt }, { role: "assistant", content: response.content }],
+    });
+  }
+
+  const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+  const match = text.match(/\[[\s\S]*\]/);
+  const imageMap = {};
+  if (match) {
+    try {
+      const arr = JSON.parse(match[0]);
+      arr.forEach((entry, idx) => {
+        if (entry.image && searchItems[idx]) imageMap[searchItems[idx].key] = entry.image;
+      });
+    } catch {}
+  }
+  return imageMap;
+}
