@@ -1,10 +1,10 @@
 import Anthropic from "https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm";
 import * as db from "./db.js";
 import * as cloud from "./cloud.js";
-import { DEMO_KEY } from "./ai.js";
+import { DEMO_KEY, MODEL, FALLBACK_BETA } from "./ai.js";
+import { fetchPlanImages, buildPlanHTML } from "./search.js";
 
-const MODEL = "claude-sonnet-5-5";
-const FALLBACK_BETA = "server-side-fallback-2026-07-01";
+const CHAT_MODEL = "claude-sonnet-5-5";
 
 let chatOpen = false;
 let messages = [];
@@ -30,7 +30,7 @@ export function initChat() {
   panel.id = "chat-panel";
   panel.classList.add("chat-panel-closed");
   panel.innerHTML = `
-    <div class="chat-header">
+    <div class="chat-header" id="chat-header">
       <span class="chat-title">FFT Assistant</span>
       <button id="chat-close" aria-label="Close chat">&times;</button>
     </div>
@@ -56,7 +56,38 @@ export function initChat() {
   });
   document.getElementById("chat-file").addEventListener("change", handleFileAttach);
 
-  addBotMessage("Hi! I'm your travel assistant. I can help you:\n\n• Plan trips based on your posts or a location\n• Identify products and places from photos/videos\n• Find hotels, restaurants, activities with booking links\n• Save plans and share them\n\nWhat would you like to explore?");
+  initDrag();
+
+  addBotMessage("Hi! I'm your travel assistant. I can help you:\n\n• Select posts on Home and ask me to plan similar trips\n• Identify products and places from photos/videos\n• Find hotels, restaurants, activities with booking links\n• Save plans, download itineraries, and share them\n\nSelect posts on the Home tab or just ask me anything!");
+}
+
+function initDrag() {
+  if (matchMedia("(max-width: 599px)").matches) return;
+  const header = document.getElementById("chat-header");
+  const panel = document.getElementById("chat-panel");
+  let dragging = false, startX, startY, origX, origY;
+
+  header.style.cursor = "grab";
+  header.addEventListener("mousedown", (e) => {
+    if (e.target.id === "chat-close") return;
+    dragging = true;
+    header.style.cursor = "grabbing";
+    const rect = panel.getBoundingClientRect();
+    startX = e.clientX; startY = e.clientY;
+    origX = rect.left; origY = rect.top;
+    e.preventDefault();
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    panel.style.left = `${origX + dx}px`;
+    panel.style.top = `${origY + dy}px`;
+    panel.style.right = "auto";
+    panel.style.bottom = "auto";
+  });
+  document.addEventListener("mouseup", () => {
+    if (dragging) { dragging = false; header.style.cursor = "grab"; }
+  });
 }
 
 function toggleChat() {
@@ -242,32 +273,23 @@ async function sendMessage() {
 
   try {
     const ctx = await getContext();
-    const systemPrompt = `You are the Fun, Food & Travel assistant — a friendly, knowledgeable travel and lifestyle AI.
+    const systemPrompt = `You are the Fun, Food & Travel assistant. Be concise and action-oriented.
 
-CONTEXT: The user has ${ctx.postCount} posts and ${ctx.planCount} saved plans in the app. They are on the "${ctx.currentTab}" tab.
-${ctx.selectedPosts.length ? `\nSELECTED POSTS (user has checked these on the Home tab): ${JSON.stringify(ctx.selectedPosts)}` : ""}
-${ctx.viewingPost ? `\nCURRENTLY VIEWING POST: ${JSON.stringify(ctx.viewingPost)}` : ""}
-${ctx.viewingPlan ? `\nCURRENTLY VIEWING PLAN: ${JSON.stringify(ctx.viewingPlan)}` : ""}
-${ctx.posts.length ? `\nRecent posts: ${JSON.stringify(ctx.posts)}` : "No posts yet."}
-${ctx.plans.length ? `Saved plans: ${JSON.stringify(ctx.plans)}` : "No saved plans."}
+CONTEXT: User has ${ctx.postCount} posts, ${ctx.planCount} plans. On "${ctx.currentTab}" tab.
+${ctx.selectedPosts.length ? `SELECTED POSTS: ${JSON.stringify(ctx.selectedPosts)}` : ""}
+${ctx.viewingPost ? `VIEWING POST: ${JSON.stringify(ctx.viewingPost)}` : ""}
+${ctx.viewingPlan ? `VIEWING PLAN: ${JSON.stringify(ctx.viewingPlan)}` : ""}
+${ctx.posts.length ? `Recent posts: ${JSON.stringify(ctx.posts)}` : ""}
+${ctx.plans.length ? `Saved plans: ${JSON.stringify(ctx.plans)}` : ""}
 
-CAPABILITIES:
-1. **Travel planning**: Recommend destinations, activities, hotels, restaurants with real booking links. Use web search to find current prices.
-2. **Product identification**: Identify products, brands, gear from photos. Find purchase links.
-3. **Location identification**: Identify places from photos/videos. Suggest nearby activities.
-4. **Plan creation**: Create detailed "Pack your Plan" itineraries with sections for flights, hotels, activities, restaurants, products, budget.
-5. **Recommendations**: Suggest similar destinations, activities, products based on the user's posts.
-
-RESPONSE FORMAT:
-- Be conversational and helpful
-- Include **clickable links** for bookings, products, etc. using markdown: [text](url)
-- Use **bold** for important info
-- When creating a plan, format it clearly with sections
-- If you need more info, ask follow-up questions
-- Keep responses concise but informative
-- When the user wants to save a plan, format it as JSON at the end wrapped in \`\`\`json ... \`\`\` with structure: {"plan": {"destination": "...", "overview": "...", "sections": [{"title": "...", "items": [{"name": "...", "description": "...", "category": "flight|hotel|activity|restaurant|product", "price": "...", "link": "..."}]}], "budget": "..."}}
-
-LOCATION: If the user asks about "around me" or "near me", ask them to share their location or specify a city.`;
+RULES:
+1. You HAVE web search — use it to find real booking links and current prices. You are NOT in a sandbox. You have full internet access via the web_search tool.
+2. When the user asks to create/save a plan, OUTPUT THE JSON IMMEDIATELY in your response. Do not say "I'll work on it" — just do it. The app auto-saves JSON plans.
+3. Keep responses under 500 words. Be direct, skip preamble.
+4. When the selected posts or current post is visible in context above, USE that info directly — don't ask the user to describe it again.
+5. For multi-part requests (save plan + download), produce the plan JSON first. The app handles download separately.
+6. Include **clickable links** using markdown [text](url). Use **bold** for key info.
+7. Format plan JSON at the end wrapped in \`\`\`json ... \`\`\` with structure: {"plan": {"destination": "...", "overview": "...", "sections": [{"title": "...", "items": [{"name": "...", "description": "...", "category": "flight|hotel|activity|restaurant|product", "price": "...", "link": "..."}]}], "budget": "..."}}`;
 
     const client = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true });
 
@@ -276,23 +298,23 @@ LOCATION: If the user asks about "around me" or "near me", ask them to share the
       content: m.content,
     }));
 
-    showStatus("Searching and planning…");
+    showStatus("Searching the web…");
 
     let response = await client.beta.messages.create({
-      model: MODEL, max_tokens: 4096,
+      model: CHAT_MODEL, max_tokens: 4096,
       betas: [FALLBACK_BETA], fallbacks: "default",
       system: systemPrompt,
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }],
+      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }],
       messages: apiMessages,
     });
 
-    for (let i = 0; i < 3 && response.stop_reason === "pause_turn"; i++) {
-      showStatus("Still searching…");
+    if (response.stop_reason === "pause_turn") {
+      showStatus("Gathering more details…");
       response = await client.beta.messages.create({
-        model: MODEL, max_tokens: 4096,
+        model: CHAT_MODEL, max_tokens: 4096,
         betas: [FALLBACK_BETA], fallbacks: "default",
         system: systemPrompt,
-        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }],
+        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }],
         messages: [...apiMessages, { role: "assistant", content: response.content }],
       });
     }
@@ -313,7 +335,7 @@ LOCATION: If the user asks about "around me" or "near me", ask them to share the
         try {
           const parsed = JSON.parse(jsonMatch[1]);
           if (parsed.plan) {
-            showPlanAction(parsed.plan);
+            await autoSavePlan(parsed.plan);
           }
         } catch {}
       }
@@ -331,29 +353,54 @@ LOCATION: If the user asks about "around me" or "near me", ask them to share the
   }
 }
 
-function showPlanAction(plan) {
+async function autoSavePlan(plan) {
+  const id = crypto.randomUUID();
+  const planObj = {
+    id, created: Date.now(),
+    destination: plan.destination || "Travel Plan",
+    overview: plan.overview || "",
+    sections: plan.sections || [],
+    budget: plan.budget || "",
+    coverImages: [],
+  };
+
+  showStatus("Saving plan…");
+  await db.savePlan(planObj);
+  cloud.uploadPlan(planObj);
+  hideStatus();
+
+  renderMessage("bot", `Plan **"${planObj.destination}"** saved to your Plans tab!`);
+
   const container = document.getElementById("chat-messages");
   const actions = document.createElement("div");
   actions.className = "chat-plan-actions";
 
-  const saveBtn = document.createElement("button");
-  saveBtn.className = "chat-action-btn primary";
-  saveBtn.textContent = "Save Plan";
-  saveBtn.addEventListener("click", async () => {
-    const id = crypto.randomUUID();
-    const planObj = {
-      id, created: Date.now(),
-      destination: plan.destination || "Travel Plan",
-      overview: plan.overview || "",
-      sections: plan.sections || [],
-      budget: plan.budget || "",
-      coverImages: [],
-    };
-    await db.savePlan(planObj);
-    cloud.uploadPlan(planObj);
-    saveBtn.textContent = "Saved!";
-    saveBtn.disabled = true;
-    addBotMessage(`Plan saved! Go to the **Plans** tab to view it, download the travel itinerary, or share it.`);
+  const dlBtn = document.createElement("button");
+  dlBtn.className = "chat-action-btn primary";
+  dlBtn.textContent = "Download Itinerary";
+  dlBtn.addEventListener("click", async () => {
+    dlBtn.disabled = true;
+    dlBtn.textContent = "Finding photos…";
+    try {
+      const images = await fetchPlanImages(apiKey(), planObj);
+      const html = buildPlanHTML(planObj, images);
+      const blob = new Blob([html], { type: "text/html" });
+      const file = new File([blob], `${planObj.destination || "Travel-Plan"}.html`, { type: "text/html" });
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: planObj.destination });
+      } else {
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        const a = document.createElement("a"); a.href = url; a.download = file.name; a.click();
+      }
+      dlBtn.textContent = "Downloaded!";
+      renderMessage("bot", "Itinerary downloaded! Open it in your browser, then **Cmd+P** (or Ctrl+P) to save as PDF. Attach the file to email, WhatsApp, etc.");
+    } catch (err) {
+      dlBtn.textContent = "Download Itinerary";
+      dlBtn.disabled = false;
+      renderMessage("bot", `Couldn't generate itinerary: ${err.message}`);
+    }
   });
 
   const viewBtn = document.createElement("button");
@@ -361,10 +408,11 @@ function showPlanAction(plan) {
   viewBtn.textContent = "View in Plans";
   viewBtn.addEventListener("click", () => {
     toggleChat();
-    location.hash = "#plans";
+    location.hash = `#plan/${id}`;
   });
 
-  actions.append(saveBtn, viewBtn);
+  actions.append(dlBtn, viewBtn);
   container.append(actions);
   container.scrollTop = container.scrollHeight;
 }
+

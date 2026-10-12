@@ -4,10 +4,10 @@
 
 import Anthropic from "https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm";
 
-const MODEL = "claude-opus-5-5";
+export const MODEL = "claude-opus-5-5";
 // Server-side refusal fallback: if a safety classifier declines a request,
 // the API re-runs it on Anthropic's recommended fallback model.
-const FALLBACK_BETA = "server-side-fallback-2026-07-01";
+export const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
 export const DEMO_KEY = "demo";
 export const CATEGORIES = ["product", "hotel", "car_rental", "experience", "restaurant", "place"];

@@ -6,7 +6,7 @@ import { analyze, localInfo, DEMO_KEY } from "./ai.js";
 import { makeLinks } from "./links.js";
 import * as db from "./db.js";
 import { renderShareBar } from "./social.js";
-import { buildIndex, search as localSearch, smartSearch, getPost as searchGetPost, getAllPosts, fetchPlanImages } from "./search.js";
+import { buildIndex, search as localSearch, smartSearch, getPost as searchGetPost, getAllPosts, fetchPlanImages, buildPlanHTML } from "./search.js";
 import * as cloud from "./cloud.js";
 import { initChat } from "./chat.js";
 
@@ -1353,100 +1353,6 @@ function planShareText(plan) {
   return lines.join("\n");
 }
 
-function buildPlanHTML(plan, images = {}) {
-  const esc = (s) => (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
-  const heroImg = images.destination
-    ? `<div style="width:100%;height:240px;border-radius:16px;overflow:hidden;margin:16px 0">
-         <img src="${esc(images.destination)}" alt="${esc(plan.destination)}"
-              style="width:100%;height:100%;object-fit:cover"
-              onerror="this.parentElement.style.display='none'">
-       </div>`
-    : "";
-
-  let sections = "";
-  let itemIdx = 0;
-  for (let si = 0; si < (plan.sections || []).length; si++) {
-    const s = plan.sections[si];
-    let items = "";
-    for (let ii = 0; ii < (s.items || []).length; ii++) {
-      const it = s.items[ii];
-      const imgKey = `${si}-${ii}`;
-      const imgUrl = images[imgKey];
-      const imgHtml = imgUrl
-        ? `<img src="${esc(imgUrl)}" alt="${esc(it.name)}"
-               style="width:100%;height:180px;object-fit:cover;border-radius:10px 10px 0 0;display:block"
-               onerror="this.style.display='none'">`
-        : "";
-      const priceHtml = it.price
-        ? `<span style="display:inline-block;background:linear-gradient(135deg,#e8590c,#e84393);color:#fff;padding:3px 10px;border-radius:20px;font-size:0.82rem;font-weight:700;margin-left:8px">${esc(it.price)}</span>`
-        : "";
-      const descHtml = it.description
-        ? `<p style="color:#6b7280;font-size:0.88rem;margin:6px 0 0;line-height:1.4">${esc(it.description)}</p>`
-        : "";
-      const linkHtml = it.link
-        ? `<a href="${esc(it.link)}" target="_blank" rel="noopener"
-              style="display:inline-block;margin-top:10px;padding:8px 20px;border-radius:8px;background:linear-gradient(135deg,#e8590c,#e84393);color:#fff;text-decoration:none;font-size:0.88rem;font-weight:700;letter-spacing:0.3px">Book / Buy &rarr;</a>`
-        : "";
-
-      items += `<li style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin:10px 0;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
-        ${imgHtml}
-        <div style="padding:14px">
-          <strong style="font-size:1rem">${esc(it.name)}</strong>${priceHtml}
-          ${descHtml}${linkHtml}
-        </div>
-      </li>`;
-      itemIdx++;
-    }
-    sections += `<h3 style="margin:28px 0 10px;font-size:1.15rem;color:#1a1a2e;border-bottom:2px solid #e84393;padding-bottom:6px">${esc(s.title)}</h3>
-      <ul style="list-style:none;padding:0;margin:0">${items}</ul>`;
-  }
-
-  const budgetHtml = plan.budget
-    ? `<div style="margin:28px 0;padding:18px;border-radius:14px;background:linear-gradient(135deg,#fdf2f8,#fff1f2);border:1px solid #fce7f3;font-weight:700;font-size:1.05rem;text-align:center;color:#1a1a2e">
-         💰 ${esc(plan.budget)}
-       </div>`
-    : "";
-
-  const coverHtml = (plan.coverImages || [])
-    .map((src) => `<img src="${src}" alt="" style="width:100px;height:75px;object-fit:cover;border-radius:8px" onerror="this.style.display='none'">`)
-    .join("");
-  const coverRow = coverHtml
-    ? `<div style="display:flex;gap:8px;margin:12px 0;flex-wrap:wrap">${coverHtml}</div>`
-    : "";
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>🎒 ${esc(plan.destination)} — Travel Itinerary</title>
-<style>
-  * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 640px; margin: 0 auto; padding: 0; color: #1a1a2e; background: #fafafa; }
-  a { color: #e84393; }
-  @media print { body { background: #fff; } }
-</style>
-</head>
-<body>
-<div style="background:linear-gradient(135deg,#e8590c,#e84393,#d63384);padding:32px 24px 24px;color:#fff;border-radius:0 0 24px 24px">
-  <p style="margin:0;font-size:0.85rem;opacity:0.9;letter-spacing:1px;text-transform:uppercase">Travel Itinerary</p>
-  <h1 style="margin:8px 0 0;font-size:1.8rem;font-weight:800">🎒 ${esc(plan.destination)}</h1>
-</div>
-<div style="padding:20px 16px">
-${heroImg}
-${coverRow}
-<p style="color:#4b5563;line-height:1.6;font-size:0.95rem">${esc(plan.overview || "")}</p>
-${sections}
-${budgetHtml}
-<div style="margin-top:32px;padding:16px;text-align:center;border-top:1px solid #e5e7eb">
-  <p style="font-size:0.75rem;color:#9ca3af;margin:0">Created with Fun, Food &amp; Travel</p>
-  <p style="font-size:0.7rem;color:#d1d5db;margin:4px 0 0">Photos sourced from the web. Prices are estimates — confirm on each site before booking.</p>
-</div>
-</div>
-</body>
-</html>`;
-}
 
 // ---------- helpers ----------
 
