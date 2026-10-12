@@ -314,7 +314,29 @@ ${coverRow}
 <p style="color:#4b5563;line-height:1.6;font-size:0.95rem">${esc(plan.overview || "")}</p>
 ${sections}
 ${budgetHtml}
-<div style="margin-top:32px;padding:16px;text-align:center;border-top:1px solid #e5e7eb">
+<div style="margin:32px 0 16px;padding:20px;text-align:center;background:linear-gradient(135deg,#fdf2f8,#fff1f2);border-radius:14px;border:1px solid #fce7f3">
+  <p style="margin:0 0 12px;font-weight:700;font-size:0.95rem;color:#1a1a2e">Share this itinerary</p>
+  <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap">
+    <a href="https://wa.me/?text=${encodeURIComponent(`🎒 Check out my travel plan: ${plan.destination}\n${plan.overview || ""}`)}" target="_blank" rel="noopener"
+       style="display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:10px;background:#25D366;color:#fff;text-decoration:none;font-weight:700;font-size:0.88rem">
+       <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M17.47 14.38c-.29-.14-1.7-.84-1.96-.93-.26-.1-.45-.14-.64.14-.19.29-.73.93-.9 1.12-.17.2-.33.22-.61.07-.29-.14-1.21-.45-2.3-1.43-.85-.76-1.43-1.7-1.6-1.98-.16-.29-.02-.44.12-.58.13-.13.29-.33.43-.5.14-.17.19-.29.29-.48.1-.19.05-.36-.02-.5-.07-.14-.64-1.55-.88-2.12-.23-.56-.47-.48-.64-.49h-.55c-.19 0-.5.07-.76.36-.26.29-1 .98-1 2.38s1.02 2.76 1.17 2.95c.14.19 2.01 3.07 4.88 4.3.68.3 1.22.47 1.63.6.69.22 1.31.19 1.8.12.55-.08 1.7-.7 1.94-1.37.24-.67.24-1.25.17-1.37-.07-.12-.26-.19-.55-.33zM12 2C6.48 2 2 6.48 2 12c0 1.77.46 3.44 1.28 4.89L2 22l5.23-1.25A9.96 9.96 0 0012 22c5.52 0 10-4.48 10-10S17.52 2 12 2z"/></svg>
+       WhatsApp</a>
+    <a href="mailto:?subject=${encodeURIComponent(`🎒 ${plan.destination} — Travel Itinerary`)}&body=${encodeURIComponent(`Check out my travel plan for ${plan.destination}!\n\n${plan.overview || ""}\n\nCreated with Fun, Food & Travel`)}" target="_blank"
+       style="display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:10px;background:#EA4335;color:#fff;text-decoration:none;font-weight:700;font-size:0.88rem">
+       <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+       Email</a>
+    <a href="https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(`🎒 ${plan.destination} Travel Itinerary`)}" target="_blank" rel="noopener"
+       style="display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:10px;background:#1877F2;color:#fff;text-decoration:none;font-weight:700;font-size:0.88rem">
+       <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M24 12.07C24 5.41 18.63 0 12 0S0 5.41 0 12.07c0 6.02 4.39 11.01 10.13 11.93v-8.44H7.08v-3.49h3.04V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.95.93-1.95 1.89v2.26h3.33l-.53 3.49h-2.8v8.44C19.61 23.08 24 18.09 24 12.07z"/></svg>
+       Facebook</a>
+    <a href="https://twitter.com/intent/tweet?text=${encodeURIComponent(`🎒 Check out my travel plan: ${plan.destination}`)}" target="_blank" rel="noopener"
+       style="display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:10px;background:#000;color:#fff;text-decoration:none;font-weight:700;font-size:0.88rem">
+       <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+       X</a>
+  </div>
+  <p style="margin:12px 0 0;font-size:0.78rem;color:#9ca3af">Tip: Save as PDF with Cmd+P (Mac) or Ctrl+P (Windows), then share the file</p>
+</div>
+<div style="padding:16px;text-align:center;border-top:1px solid #e5e7eb">
   <p style="font-size:0.75rem;color:#9ca3af;margin:0">Created with Fun, Food &amp; Travel</p>
   <p style="font-size:0.7rem;color:#d1d5db;margin:4px 0 0">Photos sourced from the web. Prices are estimates — confirm on each site before booking.</p>
 </div>

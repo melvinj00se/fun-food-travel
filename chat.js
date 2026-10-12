@@ -308,8 +308,9 @@ RULES:
       messages: apiMessages,
     });
 
-    if (response.stop_reason === "pause_turn") {
-      showStatus("Gathering more details…");
+    const statusMsgs = ["Gathering more details…", "Almost there…", "Finishing up…"];
+    for (let i = 0; i < 3 && response.stop_reason === "pause_turn"; i++) {
+      showStatus(statusMsgs[i] || "Still working…");
       response = await client.beta.messages.create({
         model: CHAT_MODEL, max_tokens: 4096,
         betas: [FALLBACK_BETA], fallbacks: "default",
@@ -340,7 +341,7 @@ RULES:
         } catch {}
       }
     } else {
-      addBotMessage("I couldn't generate a response. Please try again.");
+      addBotMessage("The search took longer than expected. Please try rephrasing your request more specifically, or break it into smaller questions.");
     }
 
   } catch (err) {
