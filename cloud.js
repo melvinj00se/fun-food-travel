@@ -30,7 +30,13 @@ async function rest(path, opts = {}) {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Cloud: ${res.status} ${body.slice(0, 200)}`);
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(`Permission denied (${res.status}). Check Supabase anon key and RLS policies.`);
+    }
+    if (res.status === 404) {
+      throw new Error(`Table not found (404). Create shared_posts and shared_plans tables in Supabase.`);
+    }
+    throw new Error(`Cloud ${res.status}: ${body.slice(0, 200)}`);
   }
   if (opts.prefer?.includes("return=minimal")) return true;
   return res.json();

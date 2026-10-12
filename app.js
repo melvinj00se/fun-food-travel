@@ -77,10 +77,18 @@ $("save-settings").addEventListener("click", async () => {
   if (cloud.isConfigured()) {
     status("settings", "Saved. Testing cloud connection…");
     try {
-      await cloud.fetchPosts(1);
-      status("settings", "Saved. Cloud connected!");
+      const testPosts = await cloud.fetchPosts(1);
+      status("settings", `Saved. Cloud connected! (${testPosts.length ? "posts found" : "no posts in cloud yet"})`);
+      const localPosts = await db.listPosts();
+      if (localPosts.length) {
+        status("settings", "Syncing local posts to cloud…");
+        for (const p of localPosts) await cloud.uploadPost(p);
+        const plans = await db.listPlans();
+        for (const p of plans) await cloud.uploadPlan(p);
+        status("settings", `Cloud connected! Synced ${localPosts.length} post(s) and ${plans.length} plan(s).`);
+      }
     } catch (err) {
-      status("settings", `Saved, but cloud failed: ${err.message}`);
+      status("settings", `Saved, but cloud failed: ${err.message}. Check your Supabase URL and key. Also ensure RLS policies allow select/insert for anon role.`);
     }
   } else {
     status("settings", "Saved. (Cloud sharing not configured — posts stay on this device only.)");
@@ -213,10 +221,16 @@ async function renderHomeFeed() {
       }
       merged.sort((a, b) => b.created - a.created);
       posts = merged;
-      status("home", "");
-    } catch {
+      if (cloudPosts.length) {
+        status("home", "");
+      } else if (localPosts.length) {
+        status("home", "Cloud connected but no shared posts found. Your local posts are shown.");
+      } else {
+        status("home", "Cloud connected but no posts found. Go to Settings and tap 'Sync all posts & plans to cloud now'.");
+      }
+    } catch (err) {
       posts = localPosts;
-      status("home", "Couldn't reach cloud — showing local posts only.");
+      status("home", `Cloud error: ${err.message}. Showing local posts only. Check Settings.`);
     }
   } else {
     posts = localPosts;
