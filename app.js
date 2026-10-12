@@ -1215,16 +1215,16 @@ async function renderSavedPlan(id) {
   // Share — use clipboard on desktop, native share on mobile only
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   $("share-plan-doc").onclick = async () => {
-    try {
-      if (isMobile && navigator.share) {
+    if (isMobile && navigator.share) {
+      try {
         await navigator.share({ title: `🎒 ${plan.destination}`, text });
-      } else {
-        await navigator.clipboard.writeText(text);
-        status("plan", "Plan copied! Use the social icons above to share on WhatsApp, Facebook, X, email, etc.");
-        $("plan-share-bar")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch (err) {
+        if (err.name !== "AbortError") status("plan", `Couldn't share: ${err.message}`);
       }
-    } catch (err) {
-      if (err.name !== "AbortError") status("plan", `Couldn't share: ${err.message}`);
+    } else {
+      try { await navigator.clipboard.writeText(text); } catch {}
+      status("plan", "Plan copied! Tap a social icon above to share.");
+      $("plan-share-bar")?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
 
@@ -1242,8 +1242,10 @@ async function renderSavedPlan(id) {
       } else {
         const url = URL.createObjectURL(blob);
         window.open(url, "_blank");
+        const a = document.createElement("a");
+        a.href = url; a.download = file.name; a.click();
       }
-      status("plan", "Travel itinerary opened! Press Cmd+P (or Ctrl+P) to save as PDF.");
+      status("plan", "Travel itinerary downloaded and opened! Attach it to email, WhatsApp, etc. or press Cmd+P to save as PDF.");
     } catch (err) {
       status("plan", `Couldn't generate document: ${err.message}`);
     } finally {
