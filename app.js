@@ -1461,11 +1461,31 @@ if ("serviceWorker" in navigator) {
 async function syncAllToCloud() {
   if (!cloud.isConfigured()) return;
   try {
-    const posts = await db.listPosts();
-    for (const p of posts) await cloud.uploadPost(p);
-    const plans = await db.listPlans();
-    for (const p of plans) await cloud.uploadPlan(p);
-    if (posts.length || plans.length) console.log(`Cloud sync: ${posts.length} posts, ${plans.length} plans`);
+    const localPosts = await db.listPosts();
+    for (const p of localPosts) await cloud.uploadPost(p);
+    const localPlans = await db.listPlans();
+    for (const p of localPlans) await cloud.uploadPlan(p);
+
+    const cloudPosts = await cloud.fetchPosts(200);
+    const localIds = new Set(localPosts.map(p => p.id));
+    let downloaded = 0;
+    for (const cp of cloudPosts) {
+      if (!localIds.has(cp.id)) {
+        await db.savePost({ ...cp, media: [] });
+        downloaded++;
+      }
+    }
+
+    const cloudPlans = await cloud.fetchPlans(200);
+    const localPlanIds = new Set(localPlans.map(p => p.id));
+    for (const cp of cloudPlans) {
+      if (!localPlanIds.has(cp.id)) {
+        await db.savePlan(cp);
+        downloaded++;
+      }
+    }
+
+    if (downloaded) console.log(`Cloud sync: downloaded ${downloaded} items from cloud to local`);
   } catch (err) {
     console.warn("Cloud sync failed:", err);
   }
