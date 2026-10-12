@@ -8,6 +8,7 @@ import * as db from "./db.js";
 import { renderShareBar } from "./social.js";
 import { buildIndex, search as localSearch, smartSearch, getPost as searchGetPost, getAllPosts, fetchPlanImages } from "./search.js";
 import * as cloud from "./cloud.js";
+import { initChat } from "./chat.js";
 
 const MAX_FRAMES = 12;
 const FRAMES_PER_VIDEO = 6;
@@ -330,14 +331,54 @@ async function homeSearch() {
 $("home-search-go").addEventListener("click", homeSearch);
 $("home-search-query").addEventListener("keydown", (e) => { if (e.key === "Enter") homeSearch(); });
 
-$("home-plan-similar").addEventListener("click", async () => {
+$("home-plan-similar").addEventListener("click", () => {
   if (!homeSelectedPosts.size) return;
+  showLocationChoice();
+});
+
+function showLocationChoice() {
+  let existing = document.getElementById("location-choice-dialog");
+  if (existing) existing.remove();
+  const dialog = document.createElement("div");
+  dialog.id = "location-choice-dialog";
+  dialog.className = "location-choice-overlay";
+  dialog.innerHTML = `
+    <div class="location-choice-card">
+      <h3>Where would you like to plan?</h3>
+      <button class="location-choice-btn" data-choice="original">
+        <strong>Same location(s)</strong>
+        <span>Plan in the location(s) from the selected posts</span>
+      </button>
+      <button class="location-choice-btn" data-choice="current">
+        <strong>Around my location</strong>
+        <span>Find similar activities near where I am now</span>
+      </button>
+      <button class="location-choice-btn" data-choice="both">
+        <strong>Both</strong>
+        <span>Get plans for both the original and my current location</span>
+      </button>
+      <button class="location-choice-cancel">Cancel</button>
+    </div>
+  `;
+  document.body.append(dialog);
+  dialog.querySelector(".location-choice-cancel").addEventListener("click", () => dialog.remove());
+  dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.remove(); });
+  for (const btn of dialog.querySelectorAll("[data-choice]")) {
+    btn.addEventListener("click", () => {
+      const choice = btn.dataset.choice;
+      dialog.remove();
+      runPlanSimilar(choice);
+    });
+  }
+}
+
+async function runPlanSimilar(choice) {
   $("home-plan-similar").disabled = true;
   removeFabShare();
-  const query = $("home-search-query").value.trim() || "plan a vacation with all details similar to shown";
+  const baseQuery = $("home-search-query").value.trim();
 
   let userLocation = null;
-  if (queryNeedsLocation(query)) {
+  if (choice === "current" || choice === "both") {
     status("home", "Getting your location…");
     userLocation = await getUserLocation();
     if (!userLocation) {
@@ -345,21 +386,40 @@ $("home-plan-similar").addEventListener("click", async () => {
       $("home-plan-similar").disabled = false;
       return;
     }
-    status("home", "Planning around your location…");
-  } else {
-    status("home", "Planning your trip based on selected videos…");
   }
 
-  try {
-    const result = await smartSearch(apiKey(), query, [...homeSelectedPosts], userLocation);
-    renderSearchResult(result, "home");
+  const postIds = [...homeSelectedPosts];
+
+  if (choice === "both") {
+    status("home", "Planning for original location(s)…");
+    try {
+      const q1 = baseQuery || "plan a detailed vacation at these locations with all bookings and activities";
+      const r1 = await smartSearch(apiKey(), q1, postIds, null);
+      renderSearchResult(r1, "home");
+    } catch (err) { status("home", err.message); }
+
+    status("home", "Now planning around your location…");
+    try {
+      const q2 = baseQuery || "plan similar activities and experiences near my current location";
+      const r2 = await smartSearch(apiKey(), q2, postIds, userLocation);
+      renderSearchResult(r2, "home");
+    } catch (err) { status("home", err.message); }
     status("home", "");
-  } catch (err) {
-    status("home", err.message);
-  } finally {
-    $("home-plan-similar").disabled = false;
+  } else {
+    const query = choice === "current"
+      ? (baseQuery || "plan similar activities and experiences near my current location")
+      : (baseQuery || "plan a detailed vacation at these locations with all bookings and activities");
+    status("home", choice === "current" ? "Planning around your location…" : "Planning your trip based on selected videos…");
+    try {
+      const result = await smartSearch(apiKey(), query, postIds, choice === "current" ? userLocation : null);
+      renderSearchResult(result, "home");
+      status("home", "");
+    } catch (err) {
+      status("home", err.message);
+    }
   }
-});
+  $("home-plan-similar").disabled = false;
+}
 
 // ---------- Step 1: pick & sample ----------
 
@@ -1413,3 +1473,4 @@ async function syncAllToCloud() {
 
 route();
 syncAllToCloud();
+initChat();
