@@ -97,6 +97,40 @@ export async function fetchPost(id) {
   } catch { return null; }
 }
 
+export async function fetchPlans(limit = 200) {
+  if (!isConfigured()) return [];
+  try {
+    const rows = await rest(`shared_plans?order=created.desc&limit=${limit}`);
+    return (rows || []).map((r) => ({
+      id: r.id,
+      created: r.created,
+      destination: r.destination,
+      overview: r.overview,
+      sections: r.sections || [],
+      budget: r.budget,
+      coverImages: r.cover_images || [],
+      _cloud: true,
+    }));
+  } catch (err) {
+    console.warn("Cloud plans fetch failed:", err);
+    return [];
+  }
+}
+
+export async function fetchPlan(id) {
+  if (!isConfigured()) return null;
+  try {
+    const rows = await rest(`shared_plans?id=eq.${id}&limit=1`);
+    if (!rows?.length) return null;
+    const r = rows[0];
+    return {
+      id: r.id, created: r.created, destination: r.destination,
+      overview: r.overview, sections: r.sections || [],
+      budget: r.budget, coverImages: r.cover_images || [], _cloud: true,
+    };
+  } catch { return null; }
+}
+
 export async function uploadPlan(plan) {
   if (!isConfigured()) return;
   try {

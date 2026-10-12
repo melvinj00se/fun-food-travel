@@ -650,14 +650,33 @@ function resetNew() {
 // ---------- My posts ----------
 
 async function renderPostList() {
-  const posts = await db.listPosts();
+  const localPosts = await db.listPosts();
+  let posts;
+
+  if (cloud.isConfigured()) {
+    try {
+      const cloudPosts = await cloud.fetchPosts(200);
+      const localIds = new Set(localPosts.map((p) => p.id));
+      const merged = [...localPosts];
+      for (const cp of cloudPosts) {
+        if (!localIds.has(cp.id)) merged.push(cp);
+      }
+      merged.sort((a, b) => b.created - a.created);
+      posts = merged;
+    } catch {
+      posts = localPosts;
+    }
+  } else {
+    posts = localPosts;
+  }
+
   $("posts-empty").hidden = posts.length > 0;
   $("post-list").innerHTML = "";
   for (const p of posts) {
     const li = document.createElement("li");
     li.innerHTML = `<a class="post-row"><img alt=""><div><strong></strong><p class="small muted"></p></div></a>`;
     li.querySelector("a").href = `#post/${p.id}`;
-    li.querySelector("img").src = p.cover;
+    if (p.cover) li.querySelector("img").src = p.cover;
     li.querySelector("strong").textContent = p.caption || "Untitled post";
     li.querySelector("p").textContent = [p.place, new Date(p.created).toLocaleDateString()].filter(Boolean).join(" · ");
     $("post-list").append(li);
@@ -1088,7 +1107,26 @@ async function savePlanToDb(plan, posts, ctx) {
 // ---------- Pack the Plan tab ----------
 
 async function renderPlansList() {
-  const plans = await db.listPlans();
+  const localPlans = await db.listPlans();
+  let plans;
+
+  if (cloud.isConfigured()) {
+    try {
+      const cloudPlans = await cloud.fetchPlans(200);
+      const localIds = new Set(localPlans.map((p) => p.id));
+      const merged = [...localPlans];
+      for (const cp of cloudPlans) {
+        if (!localIds.has(cp.id)) merged.push(cp);
+      }
+      merged.sort((a, b) => b.created - a.created);
+      plans = merged;
+    } catch {
+      plans = localPlans;
+    }
+  } else {
+    plans = localPlans;
+  }
+
   $("plans-empty").hidden = plans.length > 0;
   const list = $("plans-list");
   list.innerHTML = "";
@@ -1109,7 +1147,10 @@ async function renderSavedPlan(id) {
   const body = $("plan-body");
   body.innerHTML = "";
   status("plan", "");
-  const plan = await db.getPlan(id);
+  let plan = await db.getPlan(id);
+  if (!plan && cloud.isConfigured()) {
+    try { plan = await cloud.fetchPlan(id); } catch {}
+  }
   if (!plan) {
     body.append(el("p", { class: "muted" }, "Plan not found."));
     return;
