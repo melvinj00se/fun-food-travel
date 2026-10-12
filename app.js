@@ -833,28 +833,34 @@ $("share-post").addEventListener("click", async () => {
   const p = currentPost;
   if (!p) return;
   const text = shareText(p);
-  const shareableMedia = p.media.filter((m) => m.blob.size < 20 * 1024 * 1024);
-  let files = shareableMedia.map((m) => new File([m.blob], m.name, { type: m.type }));
-  if (!files.length && p.cover) {
-    try {
-      const resp = await fetch(p.cover);
-      const blob = await resp.blob();
-      files = [new File([blob], "cover.jpg", { type: "image/jpeg" })];
-    } catch {}
-  }
-  try {
-    if (files.length && navigator.canShare?.({ files, text })) {
-      await navigator.share({ files, text });
-    } else if (navigator.share) {
-      await navigator.share({ title: p.caption, text });
-    } else {
-      await navigator.clipboard.writeText(text);
-      status("post", "Post text and links copied. Paste them anywhere.");
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    const shareableMedia = (p.media || []).filter((m) => m.blob?.size < 20 * 1024 * 1024);
+    let files = shareableMedia.map((m) => new File([m.blob], m.name, { type: m.type }));
+    if (!files.length && p.cover) {
+      try {
+        const resp = await fetch(p.cover);
+        const blob = await resp.blob();
+        files = [new File([blob], "cover.jpg", { type: "image/jpeg" })];
+      } catch {}
     }
-  } catch (err) {
-    if (err.name === "AbortError") return;
-    try { await navigator.share({ title: p.caption, text }); }
-    catch (e2) { if (e2.name !== "AbortError") status("post", `Couldn't share: ${e2.message}`); }
+    try {
+      if (files.length && navigator.canShare?.({ files, text })) {
+        await navigator.share({ files, text });
+      } else if (navigator.share) {
+        await navigator.share({ title: p.caption, text });
+      }
+    } catch (err) {
+      if (err.name !== "AbortError") status("post", `Couldn't share: ${err.message}`);
+    }
+  } else {
+    try {
+      await navigator.clipboard.writeText(text);
+      status("post", "Post copied! Use the social icons above to share on WhatsApp, Facebook, X, email, etc.");
+      $("post-share-bar")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (err) {
+      status("post", `Couldn't copy: ${err.message}`);
+    }
   }
 });
 
@@ -957,22 +963,20 @@ let fabShareBtn = null;
 
 function showFabShare(planText) {
   removeFabShare();
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   fabShareBtn = el("button", { class: "fab-share" });
   fabShareBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>Share`;
   fabShareBtn.addEventListener("click", async () => {
+    const active = location.hash.startsWith("#home") ? "home" : "search";
     try {
-      if (navigator.share) {
+      if (isMobile && navigator.share) {
         await navigator.share({ title: "Pack your Plan", text: planText });
       } else {
         await navigator.clipboard.writeText(planText);
-        const active = location.hash.startsWith("#home") ? "home" : "search";
-        status(active, "Plan copied to clipboard!");
+        status(active, "Plan copied! Use the social icons above to share on WhatsApp, Facebook, X, email, etc.");
       }
     } catch (err) {
-      if (err.name !== "AbortError") {
-        const active = location.hash.startsWith("#home") ? "home" : "search";
-        status(active, `Couldn't share: ${err.message}`);
-      }
+      if (err.name !== "AbortError") status(active, `Couldn't share: ${err.message}`);
     }
   });
   document.body.append(fabShareBtn);
@@ -1088,13 +1092,18 @@ function renderPlan(plan, posts, ctx = "home") {
   }
   shareLines.push("", "Created with Fun, Food & Travel");
 
+  const shareText = shareLines.join("\n");
+  const shareHeading = el("p", { class: "share-heading" }, "Share to your favorite platforms");
+  container.append(shareHeading);
+  container.append(renderShareBar(shareText, null, null));
+
   const actions = el("div", { class: "plan-actions" });
   const saveBtn = el("button", { class: "primary" }, "Save Plan");
   saveBtn.addEventListener("click", () => savePlanToDb(plan, posts, ctx));
   actions.append(saveBtn);
   container.append(actions);
 
-  showFabShare(shareLines.join("\n"));
+  showFabShare(shareText);
 }
 
 async function savePlanToDb(plan, posts, ctx) {
@@ -1232,11 +1241,9 @@ async function renderSavedPlan(id) {
         await navigator.share({ files: [file], title: plan.destination });
       } else {
         const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url; a.download = file.name; a.click();
-        URL.revokeObjectURL(url);
+        window.open(url, "_blank");
       }
-      status("plan", "Travel itinerary ready with photos and booking links!");
+      status("plan", "Travel itinerary opened! Press Cmd+P (or Ctrl+P) to save as PDF.");
     } catch (err) {
       status("plan", `Couldn't generate document: ${err.message}`);
     } finally {

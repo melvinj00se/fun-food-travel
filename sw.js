@@ -1,7 +1,7 @@
 // Offline support: keep a copy of the app so it opens without a connection.
 // Local files: network-first (new version shows up as soon as you're online).
 // CDN files: cache-first (they're versioned/immutable, no need to re-fetch).
-const CACHE = "fft-v8";
+const CACHE = "fft-v9";
 const LOCAL_SHELL = [
   "./", "index.html", "app.js", "ai.js", "links.js", "db.js",
   "search.js", "social.js", "cloud.js", "styles.css",
