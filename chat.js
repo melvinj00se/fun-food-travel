@@ -170,14 +170,37 @@ async function getContext() {
   }
 
   const plans = await db.listPlans();
+  const postMap = (p) => ({
+    id: p.id, caption: p.caption, place: p.place,
+    items: (p.items || []).slice(0, 5).map(i => ({ name: i.name, category: i.category, brand: i.brand })),
+  });
+
+  const selectedIds = window._fftSelectedPosts || new Set();
+  const selectedPosts = selectedIds.size
+    ? allPosts.filter(p => selectedIds.has(p.id)).map(postMap)
+    : [];
+
+  let viewingPost = null;
+  let viewingPlan = null;
+  const [view, viewId] = (location.hash.slice(1) || "home").split("/");
+  if (view === "post" && viewId) {
+    const p = allPosts.find(x => x.id === viewId) || await db.getPost(viewId);
+    if (p) viewingPost = postMap(p);
+  }
+  if (view === "plan" && viewId) {
+    const p = await db.getPlan(viewId);
+    if (p) viewingPlan = { id: p.id, destination: p.destination, overview: p.overview?.slice(0, 200), sections: (p.sections || []).map(s => s.title) };
+  }
+
   return {
-    posts: allPosts.slice(0, 12).map(p => ({
-      id: p.id, caption: p.caption, place: p.place,
-      items: (p.items || []).slice(0, 5).map(i => ({ name: i.name, category: i.category, brand: i.brand })),
-    })),
+    posts: allPosts.slice(0, 12).map(postMap),
     plans: plans.slice(0, 5).map(p => ({ id: p.id, destination: p.destination, overview: p.overview?.slice(0, 100) })),
     postCount: allPosts.length,
     planCount: plans.length,
+    selectedPosts,
+    viewingPost,
+    viewingPlan,
+    currentTab: view,
   };
 }
 
@@ -221,8 +244,11 @@ async function sendMessage() {
     const ctx = await getContext();
     const systemPrompt = `You are the Fun, Food & Travel assistant — a friendly, knowledgeable travel and lifestyle AI.
 
-CONTEXT: The user has ${ctx.postCount} posts and ${ctx.planCount} saved plans in the app.
-${ctx.posts.length ? `Recent posts: ${JSON.stringify(ctx.posts)}` : "No posts yet."}
+CONTEXT: The user has ${ctx.postCount} posts and ${ctx.planCount} saved plans in the app. They are on the "${ctx.currentTab}" tab.
+${ctx.selectedPosts.length ? `\nSELECTED POSTS (user has checked these on the Home tab): ${JSON.stringify(ctx.selectedPosts)}` : ""}
+${ctx.viewingPost ? `\nCURRENTLY VIEWING POST: ${JSON.stringify(ctx.viewingPost)}` : ""}
+${ctx.viewingPlan ? `\nCURRENTLY VIEWING PLAN: ${JSON.stringify(ctx.viewingPlan)}` : ""}
+${ctx.posts.length ? `\nRecent posts: ${JSON.stringify(ctx.posts)}` : "No posts yet."}
 ${ctx.plans.length ? `Saved plans: ${JSON.stringify(ctx.plans)}` : "No saved plans."}
 
 CAPABILITIES:

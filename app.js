@@ -200,6 +200,7 @@ window.addEventListener("pageshow", (e) => {
 // ---------- Home tab (landing) ----------
 
 let homeSelectedPosts = new Set();
+window._fftSelectedPosts = homeSelectedPosts;
 
 async function initHome() {
   await buildIndex();
