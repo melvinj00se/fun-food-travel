@@ -28,7 +28,7 @@ export function initChat() {
 
   const panel = document.createElement("div");
   panel.id = "chat-panel";
-  panel.hidden = true;
+  panel.classList.add("chat-panel-closed");
   panel.innerHTML = `
     <div class="chat-header">
       <span class="chat-title">FFT Assistant</span>
@@ -61,7 +61,7 @@ export function initChat() {
 
 function toggleChat() {
   chatOpen = !chatOpen;
-  document.getElementById("chat-panel").hidden = !chatOpen;
+  document.getElementById("chat-panel").classList.toggle("chat-panel-closed", !chatOpen);
   document.getElementById("chat-bubble").classList.toggle("chat-bubble-hidden", chatOpen);
   if (chatOpen) {
     document.getElementById("chat-input").focus();
