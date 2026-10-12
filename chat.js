@@ -3,7 +3,7 @@ import * as db from "./db.js";
 import * as cloud from "./cloud.js";
 import { DEMO_KEY } from "./ai.js";
 
-const MODEL = "claude-sonnet-4-5-20250514";
+const MODEL = "claude-sonnet-5-5";
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
 let chatOpen = false;
