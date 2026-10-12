@@ -194,8 +194,8 @@ let homeSelectedPosts = new Set();
 
 async function initHome() {
   await buildIndex();
-  renderHomeFeed();
-  renderHomePostGrid();
+  await renderHomeFeed();
+  await renderHomePostGrid();
 }
 
 async function renderHomeFeed() {
@@ -246,12 +246,23 @@ async function renderHomeFeed() {
   }
 }
 
-function renderHomePostGrid() {
+async function renderHomePostGrid() {
   const grid = $("home-post-grid");
   if (!grid) return;
   grid.innerHTML = "";
   homeSelectedPosts.clear();
-  const posts = getAllPosts();
+  const localPosts = getAllPosts();
+  let posts = localPosts;
+  if (cloud.isConfigured() && !localPosts.length) {
+    try {
+      const cloudPosts = await cloud.fetchPosts(12);
+      const localIds = new Set(localPosts.map((p) => p.id));
+      posts = [...localPosts];
+      for (const cp of cloudPosts) {
+        if (!localIds.has(cp.id)) posts.push(cp);
+      }
+    } catch {}
+  }
   if (!posts.length) { $("home-post-select").hidden = true; return; }
   $("home-post-select").hidden = false;
   for (const p of posts.slice(0, 12)) {
